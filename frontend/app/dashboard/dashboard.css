@@ -379,3 +379,290 @@ html.light .card {
   background: rgba(34,197,94,0.15);
   color: #22c55e;
 }
+
+/* ================= LIVE ATTACK STREAM ANIMATION ================= */
+
+.attack-stream-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+  animation: attackSlide 0.4s ease;
+}
+
+@keyframes attackSlide {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ================= CRITICAL ATTACK HIGHLIGHT ================= */
+
+.attack-critical {
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  animation: criticalPulse 1.5s infinite;
+}
+
+@keyframes criticalPulse {
+  0% {
+    box-shadow: 0 0 0px rgba(239, 68, 68, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 10px rgba(239, 68, 68, 0.9);
+  }
+  100% {
+    box-shadow: 0 0 0px rgba(239, 68, 68, 0.4);
+  }
+}
+
+/* ===== SOC ALERT TICKER ===== */
+
+.alert-ticker {
+  width: 100%;
+  overflow: hidden;
+  background: #0f172a;
+  border-bottom: 1px solid #334155;
+}
+
+.alert-ticker-track {
+  display: inline-block;
+  white-space: nowrap;
+  animation: tickerScroll 25s linear infinite;
+}
+
+.alert-ticker span {
+  padding-right: 60px;
+  color: #f87171;
+  font-weight: 500;
+}
+
+@keyframes tickerScroll {
+  0% { transform: translateX(100%); }
+  100% { transform: translateX(-100%); }
+}
+
+/* ================= DASHBOARD ================= */
+
+.dashboard {
+  padding: 30px;
+  color: #e2e8f0;
+}
+
+/* ================= ATTACK STREAM ================= */
+
+.chart-card {
+  background: #0f172a;
+  border: 1px solid #1e293b;
+  border-radius: 10px;
+  padding: 20px;
+  margin-top: 20px;
+}
+
+/* attack rows */
+
+.attack-stream-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+
+  padding: 10px 14px;
+  margin-bottom: 6px;
+
+  border-radius: 6px;
+  border: 1px solid #1e293b;
+
+  background: #111827;
+
+  font-size: 13px;
+  transition: all 0.2s ease;
+}
+
+.attack-stream-row:hover {
+  background: #1f2937;
+}
+
+/* ================= SEVERITY BADGES ================= */
+
+.risk-badge {
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+/* colors */
+
+.risk-low {
+  background: #22c55e;
+  color: white;
+}
+
+.risk-medium {
+  background: #f59e0b;
+  color: black;
+}
+
+.risk-high {
+  background: #f97316;
+  color: white;
+}
+
+.risk-critical {
+  background: #ef4444;
+  color: white;
+}
+
+/* ================= CRITICAL ALERT GLOW ================= */
+
+.attack-critical {
+  border: 1px solid #ef4444;
+  background: rgba(239, 68, 68, 0.15);
+
+  box-shadow:
+    0 0 8px rgba(239,68,68,0.4),
+    inset 0 0 6px rgba(239,68,68,0.25);
+}
+
+/* ================= MUTED TEXT ================= */
+
+.muted {
+  color: #9ca3af;
+  font-size: 12px;
+}
+
+/* ================= ALERT TICKER ================= */
+
+.alert-ticker {
+  overflow: hidden;
+  border: 1px solid #1e293b;
+  border-radius: 6px;
+  margin-bottom: 15px;
+  background: #020617;
+}
+
+.alert-ticker-track {
+  display: flex;
+  gap: 40px;
+  padding: 8px 10px;
+  white-space: nowrap;
+  animation: tickerMove 25s linear infinite;
+}
+
+@keyframes tickerMove {
+  from { transform: translateX(100%); }
+  to { transform: translateX(-100%); }
+}
+
+/* ================= CRITICAL ALERT PULSE ================= */
+
+.attack-critical {
+  border: 1px solid #ef4444;
+  background: rgba(239, 68, 68, 0.15);
+
+  animation: criticalPulse 1.5s infinite;
+}
+
+/* SOC alert pulse animation */
+
+@keyframes criticalPulse {
+
+  0% {
+    box-shadow: 0 0 6px rgba(239,68,68,0.4);
+  }
+
+  50% {
+    box-shadow:
+      0 0 18px rgba(239,68,68,0.9),
+      inset 0 0 12px rgba(239,68,68,0.4);
+  }
+
+  100% {
+    box-shadow: 0 0 6px rgba(239,68,68,0.4);
+  }
+
+}
+
+.ip-link {
+  color: #38bdf8;
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.ip-link:hover {
+  text-decoration: underline;
+}
+
+.attack-stream-row {
+  display: grid;
+  grid-template-columns: 30px 160px 40px 160px 100px 100px;
+
+  align-items: center;
+
+  padding: 8px 12px;
+  margin-bottom: 6px;
+
+  border-radius: 6px;
+  border: 1px solid #1e293b;
+
+  background: #0f172a;
+
+  font-size: 13px;
+}
+
+.attack-arrow {
+  text-align: center;
+  color: #94a3b8;
+}
+
+.risk-badge {
+  display: inline-block;
+
+  padding: 2px 8px;
+
+  font-size: 11px;
+  font-weight: 600;
+
+  border-radius: 5px;
+
+  text-align: center;
+  width: fit-content;
+
+}
+
+.risk-low {
+  background: #22c55e;
+  color: white;
+}
+
+.risk-medium {
+  background: #f59e0b;
+  color: black;
+}
+
+.risk-high {
+  background: #f97316;
+  color: white;
+}
+
+.risk-critical {
+  background: #ef4444;
+  color: white;
+}
+
+.attack-stream-row {
+  line-height: 1.2;
+}
+
+.attack-arrow {
+  margin: 0 8px;
+  color: #94a3b8;
+  font-weight: 600;
+}

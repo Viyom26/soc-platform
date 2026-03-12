@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { apiFetch } from "@/lib/api";
 
 type Attack = {
   source: string;
@@ -9,9 +10,18 @@ type Attack = {
   time: string;
 };
 
+type LogItem = {
+  src_ip: string;
+  dst_ip?: string;
+  severity: string;
+  created_at?: string;
+};
+
 export default function AttackStream() {
 
   const [attacks, setAttacks] = useState<Attack[]>([]);
+
+  /* ================= DEMO ATTACK GENERATOR (FALLBACK) ================= */
 
   function generateAttack(): Attack {
 
@@ -45,19 +55,55 @@ export default function AttackStream() {
     };
   }
 
-  useEffect(() => {
+  /* ================= LOAD REAL ATTACK DATA ================= */
 
-    const interval = setInterval(() => {
+  async function loadRealAttacks() {
+
+    try {
+
+      const data = await apiFetch("/logs");
+
+      const items: LogItem[] = data?.items || [];
+
+      if (items.length === 0) return;
+
+      const mapped: Attack[] = items
+        .slice(0, 10)
+        .map((log) => ({
+          source: log.src_ip,
+          target: log.dst_ip || "Internal",
+          risk: log.severity,
+          time: log.created_at
+            ? new Date(log.created_at).toLocaleTimeString("en-IN", {
+                timeZone: "Asia/Kolkata",
+              })
+            : new Date().toLocaleTimeString(),
+        }));
+
+      setAttacks(mapped);
+
+    } catch (err) {
+
+      console.warn("Attack stream API failed, using demo mode");
 
       setAttacks((prev) => {
-
         const newAttack = generateAttack();
-
         return [newAttack, ...prev].slice(0, 10);
-
       });
 
-    }, 3000);
+    }
+
+  }
+
+  /* ================= STREAM REFRESH ================= */
+
+  useEffect(() => {
+
+    loadRealAttacks();
+
+    const interval = setInterval(() => {
+      loadRealAttacks();
+    }, 5000);
 
     return () => clearInterval(interval);
 
@@ -76,14 +122,26 @@ export default function AttackStream() {
 
           <div
             key={i}
-            className="bg-slate-800 p-2 rounded flex justify-between"
+            className={`bg-slate-800 p-2 rounded flex justify-between items-center attack-stream-row ${
+              a.risk === "CRITICAL" ? "attack-critical" : ""
+            }`}
           >
 
             <span>
               🚨 {a.source} → {a.target}
             </span>
 
-            <span className="text-red-400">
+            <span
+              className={
+                a.risk === "CRITICAL"
+                  ? "text-red-500"
+                  : a.risk === "HIGH"
+                  ? "text-orange-400"
+                  : a.risk === "MEDIUM"
+                  ? "text-yellow-400"
+                  : "text-green-400"
+              }
+            >
               {a.risk}
             </span>
 

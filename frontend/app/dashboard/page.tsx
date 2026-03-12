@@ -29,10 +29,6 @@ type LogItem = {
   created_at?: string;
 };
 
-type LogsResponse = {
-  items: LogItem[];
-};
-
 type Severity = {
   severity: string;
   count: number;
@@ -85,6 +81,7 @@ function AnimatedNumber({ value }: { value: number }) {
 /* ================= DASHBOARD ================= */
 
 export default function DashboardPage() {
+
   const [stats, setStats] = useState<Stats>({
     totalAlerts: 0,
     criticalAlerts: 0,
@@ -102,21 +99,34 @@ export default function DashboardPage() {
 
   const wsRef = useRef<WebSocket | null>(null);
 
-  /* ================= LIVE ATTACK STREAM (REAL DATA) ================= */
+  /* ================= LIVE ATTACK STREAM ================= */
 
   const [liveAttacks, setLiveAttacks] = useState<LogItem[]>([]);
 
   useEffect(() => {
+
     async function loadStream() {
+
       try {
+
         const logs = await apiFetch("/logs");
 
-        const items = logs?.items || [];
+        const items: LogItem[] = logs?.items || [];
 
-        setLiveAttacks(items.slice(0, 8));
+        const sorted = [...items]
+          .filter((l) => l.created_at)
+          .sort(
+            (a, b) =>
+              new Date(b.created_at || "").getTime() -
+              new Date(a.created_at || "").getTime()
+          );
+
+        setLiveAttacks(sorted.slice(0, 8));
+
       } catch (err) {
         console.error("Attack stream load error", err);
       }
+
     }
 
     loadStream();
@@ -124,12 +134,15 @@ export default function DashboardPage() {
     const interval = setInterval(loadStream, 5000);
 
     return () => clearInterval(interval);
+
   }, []);
 
   /* ================= LOAD DASHBOARD ================= */
 
   const loadDashboard = useCallback(async () => {
+
     try {
+
       const [logsData, incidents, severity, attackersData] = await Promise.all([
         apiFetch("/logs"),
         apiFetch("/incidents"),
@@ -164,6 +177,7 @@ export default function DashboardPage() {
       const grouped: Record<string, number> = {};
 
       logs.forEach((log: LogItem) => {
+
         if (!log.created_at) return;
 
         const hour = new Date(log.created_at)
@@ -172,6 +186,7 @@ export default function DashboardPage() {
           .padStart(2, "0");
 
         grouped[hour] = (grouped[hour] || 0) + 1;
+
       });
 
       const sortedTrend = Object.entries(grouped)
@@ -182,40 +197,46 @@ export default function DashboardPage() {
         }));
 
       setTrendData(sortedTrend);
+
     } catch (err) {
+
       console.error("Dashboard load error:", err);
       toast.error("Dashboard load failed");
+
     } finally {
+
       setLoading(false);
+
     }
+
   }, []);
 
   /* ================= INITIAL LOAD ================= */
 
   useEffect(() => {
+
     loadDashboard();
 
-    const interval = setInterval(() => {
-      loadDashboard();
-    }, 15000);
+    const interval = setInterval(loadDashboard, 15000);
 
     return () => clearInterval(interval);
+
   }, [loadDashboard]);
 
   /* ================= WEBSOCKET ================= */
 
   useEffect(() => {
+
     if (wsRef.current) return;
 
     const ws = new WebSocket("ws://127.0.0.1:8000/ws/alerts");
+
     wsRef.current = ws;
 
-    ws.onopen = () => {
-      console.log("✅ WebSocket Connected");
-    };
-
     ws.onmessage = (event) => {
+
       try {
+
         const data = JSON.parse(event.data);
 
         if (data.severity === "CRITICAL") {
@@ -225,23 +246,19 @@ export default function DashboardPage() {
         }
 
         loadDashboard();
-      } catch {
-        console.warn("Invalid WebSocket message", event.data);
-      }
-    };
 
-    ws.onclose = () => {
-      console.log("⚠ WebSocket Closed");
-      wsRef.current = null;
+      } catch {}
+
     };
 
     return () => {
+
       ws.close();
       wsRef.current = null;
-    };
-  }, [loadDashboard]);
 
-  /* ================= UI ================= */
+    };
+
+  }, [loadDashboard]);
 
   if (loading) {
     return (
@@ -260,13 +277,29 @@ export default function DashboardPage() {
   };
 
   return (
+
     <div className="dashboard">
+
       <Toaster position="top-right" />
+
       <h1>SOC Dashboard</h1>
 
-      {/* ================= STATS ================= */}
+      {/* ===== ALERT TICKER ===== */}
+
+      <div className="alert-ticker">
+        <div className="alert-ticker-track">
+          {liveAttacks.map((log, i) => (
+            <span key={i}>
+              🚨 {log.src_ip} → {log.dst_ip || "Internal"} [{log.severity}]
+            </span>
+          ))}
+        </div>
+      </div>
+
+      {/* ===== STATS ===== */}
 
       <div className="stats-row">
+
         <div className="stat-card">
           <span>Total Alerts</span>
           <AnimatedNumber value={stats.totalAlerts} />
@@ -286,55 +319,81 @@ export default function DashboardPage() {
           <span>Unique IPs</span>
           <AnimatedNumber value={stats.uniqueIps} />
         </div>
+
       </div>
 
-      {/* ================= CHARTS ================= */}
+      {/* ===== CHARTS ===== */}
 
       <div className="chart-grid">
+
         <div className="chart-card">
+
           <h3>Severity Distribution</h3>
 
           <ResponsiveContainer width="100%" height={300}>
+
             <PieChart>
+
               <Pie data={severityData} dataKey="count" nameKey="severity">
+
                 {severityData.map((entry, index) => (
+
                   <Cell
                     key={index}
                     fill={severityColors[entry.severity] || "#3b82f6"}
                   />
+
                 ))}
+
               </Pie>
+
               <Tooltip />
+
             </PieChart>
+
           </ResponsiveContainer>
+
         </div>
 
         <div className="chart-card">
+
           <h3>Alert Trend (Hourly)</h3>
 
           <ResponsiveContainer width="100%" height={300}>
+
             <LineChart data={trendData}>
+
               <CartesianGrid strokeDasharray="3 3" />
+
               <XAxis dataKey="hour" />
+
               <YAxis />
+
               <Tooltip />
+
               <Line
                 type="monotone"
                 dataKey="alerts"
                 stroke="#2563eb"
                 strokeWidth={3}
               />
+
             </LineChart>
+
           </ResponsiveContainer>
+
         </div>
+
       </div>
 
-      {/* ================= TOP ATTACKERS ================= */}
+      {/* ===== TOP ATTACKERS ===== */}
 
       <div className="chart-card attackers-card">
+
         <h3>Top Attacking IPs</h3>
 
         <table className="attackers-table">
+
           <thead>
             <tr>
               <th>IP Address</th>
@@ -345,62 +404,92 @@ export default function DashboardPage() {
           </thead>
 
           <tbody>
-            {attackers.slice(0, 5).map((a, i) => {
-              let level = "Low";
-              let badge = "risk-low";
 
-              if (a.avg_risk >= 70) {
-                level = "High";
-                badge = "risk-high";
-              } else if (a.avg_risk >= 40) {
-                level = "Medium";
-                badge = "risk-medium";
-              }
+            {attackers.slice(0, 5).map((a, i) => (
 
-              return (
-                <tr key={i}>
-                  <td className="ip">{a.ip}</td>
-                  <td>{a.attacks.toLocaleString()}</td>
-                  <td>{a.avg_risk}</td>
-                  <td>
-                    <span className={`risk-badge ${badge}`}>{level}</span>
-                  </td>
-                </tr>
-              );
-            })}
+              <tr key={i}>
+
+                <td className="ip">
+                  <Link href={`/investigate?ip=${a.ip}`}>
+                    {a.ip}
+                  </Link>
+                </td>
+
+                <td>{a.attacks.toLocaleString()}</td>
+
+                <td>{a.avg_risk}</td>
+
+                <td>
+                  <span className="risk-badge">
+                    {a.avg_risk >= 70 ? "High" : a.avg_risk >= 40 ? "Medium" : "Low"}
+                  </span>
+                </td>
+
+              </tr>
+
+            ))}
+
           </tbody>
+
         </table>
+
       </div>
 
-      {/* ================= GLOBAL MAP ================= */}
-
-      <div className="map-card">
-        <h3>Global Threat Intelligence</h3>
-
-        <Link href="/geo-map">
-          <div className="map-link-card">
-            🌍 Open Advanced Global Threat Map →
-          </div>
-        </Link>
-      </div>
-
-      {/* ================= LIVE ATTACK STREAM ================= */}
+      {/* ===== LIVE ATTACK STREAM ===== */}
 
       <div className="chart-card">
+
         <h3>⚡ Live Attack Stream</h3>
 
         {liveAttacks.map((log, i) => (
-          <div key={i} className="attack-stream-row">
-            🚨 {log.src_ip} → {log.dst_ip || "Internal"}
-            <span className="risk-badge risk-high">{log.severity}</span>
-            <span className="muted">
-              {new Date(log.created_at || "").toLocaleTimeString()}
+
+          <div
+            key={i}
+            className={`attack-stream-row ${
+              log.severity === "CRITICAL" ? "attack-critical" : ""
+            }`}
+          >
+
+            <span className="attack-icon">🚨</span>
+
+            <Link href={`/investigate?ip=${log.src_ip}`} className="ip-link">
+              {log.src_ip}
+            </Link>
+
+            <span className="attack-arrow">→</span>
+
+            <span>{log.dst_ip || "Internal"}</span>
+
+            <span
+              className="risk-badge"
+              style={{
+                background: severityColors[log.severity] || "#475569",
+              }}
+            >
+              {log.severity}
             </span>
+
+            <span className="muted">
+              {log.created_at
+                ? new Date(log.created_at).toLocaleString("en-IN", {
+                    timeZone: "Asia/Kolkata",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                    second: "2-digit",
+                  })
+                : "--"}
+            </span>
+
           </div>
+
         ))}
+
       </div>
 
       <HistoryPanel enableRiskFilter />
+
     </div>
+
   );
+
 }
