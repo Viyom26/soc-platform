@@ -29,11 +29,12 @@ export async function apiFetch(
     ...(options.headers as Record<string, string> || {}),
   };
 
-  if (!(options.body instanceof FormData)) {
+  /* prevent duplicate content-type */
+  if (!(options.body instanceof FormData) && !headers["Content-Type"]) {
     headers["Content-Type"] = "application/json";
   }
 
-  if (token) {
+  if (token && !headers["Authorization"]) {
     headers["Authorization"] = `Bearer ${token}`;
   }
 
@@ -70,6 +71,7 @@ export async function apiFetch(
   /* ===== HANDLE UNAUTHORIZED ===== */
 
   if (response.status === 401) {
+
     console.warn("Unauthorized — token removed");
 
     localStorage.removeItem("access_token");
@@ -84,6 +86,7 @@ export async function apiFetch(
   /* ===== HANDLE SERVER ERRORS ===== */
 
   if (!response.ok) {
+
     console.warn(`API Error ${response.status} for ${fullUrl}`);
 
     let errorText = "";
@@ -102,12 +105,14 @@ export async function apiFetch(
   const contentType = response.headers.get("content-type");
 
   if (contentType && contentType.includes("application/json")) {
+
     try {
       return await response.json();
     } catch (err) {
       console.warn("JSON parse failed:", err);
       return {};
     }
+
   }
 
   try {

@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.log_source import LogSource
+from pydantic import BaseModel
 
 router = APIRouter(prefix="/log-sources", tags=["Log Sources"])
 
@@ -10,9 +11,6 @@ router = APIRouter(prefix="/log-sources", tags=["Log Sources"])
 @router.get("")
 def get_sources(db: Session = Depends(get_db)):
     return db.query(LogSource).all()
-
-
-from pydantic import BaseModel
 
 
 class LogSourceCreate(BaseModel):
@@ -29,19 +27,6 @@ def create_source(data: LogSourceCreate, db: Session = Depends(get_db)):
         name=data.name,
         source_type=data.source_type,
         description=data.description,
-        enabled=True
-    )
-
-    db.add(source)
-    db.commit()
-
-    return {"status": "created"}
-
-    source = LogSource(
-        id=str(uuid.uuid4()),
-        name=name,
-        source_type=source_type,
-        description=description,
         enabled=True
     )
 

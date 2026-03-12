@@ -41,9 +41,6 @@ MITRE_MAP = {
 }
 
 
-# ==================================================
-# GET LOGS
-# ==================================================
 @router.get("")
 def get_logs(
     db: Session = Depends(get_db),
@@ -77,9 +74,6 @@ def get_logs(
     return {"items": items}
 
 
-# ==================================================
-# PARSE LOGS
-# ==================================================
 @router.post("/parse")
 async def parse_logs(
     background_tasks: BackgroundTasks,
@@ -89,8 +83,8 @@ async def parse_logs(
     db: Session = Depends(get_db),
 ):
 
-    if not file:
-        return {"error": "No file uploaded"}
+    if not file and not raw_text:
+        return {"error": "No file uploaded or raw logs provided"}
 
     db.query(ThreatLog).delete()
     db.query(Incident).delete()
@@ -99,11 +93,15 @@ async def parse_logs(
     UPLOAD_DIR = "uploads"
     os.makedirs(UPLOAD_DIR, exist_ok=True)
 
-    file_path = f"{UPLOAD_DIR}/{file.filename}"
-    filename = file.filename.lower()
+    filename = file.filename.lower() if file else "raw_input.log"
+    file_path = f"{UPLOAD_DIR}/{filename}"
 
-    with open(file_path, "wb") as f:
-        f.write(await file.read())
+    if file:
+        with open(file_path, "wb") as f:
+            f.write(await file.read())
+    else:
+        with open(file_path, "w", encoding="utf-8") as f:
+            f.write(raw_text)
 
     background_tasks.add_task(
         process_logs,
@@ -115,9 +113,6 @@ async def parse_logs(
     return {"message": "Log processing started in background"}
 
 
-# ==================================================
-# BACKGROUND WORKER
-# ==================================================
 def process_logs(file_path, filename, username):
 
     db = SessionLocal()
@@ -131,7 +126,6 @@ def process_logs(file_path, filename, username):
 
         rows_cache = []
 
-        # FORMAT DETECTION
         if filename.endswith(".xlsx"):
 
             workbook = load_workbook(
@@ -180,9 +174,6 @@ def process_logs(file_path, filename, username):
             print("Unsupported file format")
             return
 
-        # ==========================================
-        # PARSE ROW FUNCTION
-        # ==========================================
         def parse_row(row):
 
             try:
@@ -247,7 +238,6 @@ def process_logs(file_path, filename, username):
 
                 risk_score = risk_map.get(severity, 10)
 
-                # ================= INCIDENT AUTO CREATION =================
                 if severity in ["CRITICAL", "HIGH", "MEDIUM"] or risk_score >= 50:
 
                     if source_ip not in incident_ip_cache:
@@ -334,38 +324,18 @@ def process_logs(file_path, filename, username):
         db.commit()
 
         print(f"[SOC] Imported {len(logs_to_add)} logs")
-        
-        # ================= STREAM ALERTS =================
+
+        async def broadcast_alerts():
+            for alert in alerts_to_stream[:100]:
+                try:
+                    await manager.broadcast(alert)
+                except Exception as e:
+                    print("WebSocket broadcast failed:", e)
 
         try:
-
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-
-            for alert in alerts_to_stream:
-                loop.run_until_complete(
-                    manager.broadcast(alert)
-                )
-
-            loop.close()
-
+            asyncio.run(broadcast_alerts())
         except Exception as e:
-            print("WebSocket broadcast failed:", e)
-
-
-        # ==================================================
-        # STREAM ALERTS TO WEBSOCKET
-        # ==================================================
-        for alert in alerts_to_stream[:100]:
-            try:
-                asyncio.run(manager.broadcast(alert))
-            except Exception as e:
-                print("WebSocket broadcast failed:", e)
+            print("WebSocket loop error:", e)
 
     finally:
         db.close()
-
-    return {
-        "parsed_count": len(logs_to_add),
-        "incidents_created": len(incidents_to_add),
-    }
