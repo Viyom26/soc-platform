@@ -33,7 +33,7 @@ export default function AttackTimeline() {
 
   return (
 
-    <div className="timeline-page">
+    <div className="max-w-[1200px] mx-auto space-y-4">
 
       <h1>Attack Timeline</h1>
 

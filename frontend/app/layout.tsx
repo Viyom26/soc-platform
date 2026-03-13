@@ -17,7 +17,8 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className="transition-colors duration-300 bg-white text-gray-900 dark:bg-[#0b1220] dark:text-gray-100">
+      <body className="transition-colors duration-300 bg-white text-gray-900 dark:bg-[#0b1220] dark:text-gray-100 min-h-screen">
+
         <ClientLayout>{children}</ClientLayout>
 
         {/* GLOBAL SOC ALERT NOTIFICATIONS */}
@@ -31,6 +32,7 @@ export default function RootLayout({
             },
           }}
         />
+
       </body>
     </html>
   );

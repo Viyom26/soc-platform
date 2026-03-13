@@ -16,10 +16,16 @@ export default function LiveAttacks() {
   useEffect(() => {
 
     let ws: WebSocket | null = null;
+    let reconnectTimer: NodeJS.Timeout;
 
     function connect() {
 
-      ws = new WebSocket("ws://127.0.0.1:8000/ws/attack-stream");
+      const base =
+        process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+
+      const wsUrl = base.replace("http", "ws") + "/ws/attack-stream";
+
+      ws = new WebSocket(wsUrl);
 
       ws.onopen = () => {
         console.log("Connected to attack stream");
@@ -47,15 +53,17 @@ export default function LiveAttacks() {
 
       };
 
-      ws.onerror = (err) => {
-        console.error("WebSocket error:", err);
+      ws.onerror = () => {
+
+        console.warn("WebSocket error (backend may be restarting)");
+
       };
 
       ws.onclose = () => {
 
         console.warn("WebSocket closed, reconnecting...");
 
-        setTimeout(connect, 3000);
+        reconnectTimer = setTimeout(connect, 3000);
 
       };
 
@@ -64,14 +72,18 @@ export default function LiveAttacks() {
     connect();
 
     return () => {
+
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+
       if (ws) ws.close();
+
     };
 
   }, []);
 
   return (
 
-    <div className="p-6 text-white">
+    <div className="p-6 text-white max-w-[1200px] mx-auto">
 
       <h1 className="text-2xl mb-6">
         SOC Live Attack Stream
@@ -85,10 +97,12 @@ export default function LiveAttacks() {
 
         <div
           key={i}
-          className="bg-slate-800 p-3 mb-2 rounded"
+          className="bg-slate-800 p-3 mb-2 rounded border border-slate-700"
         >
 
-          <strong>{a.source_ip || a.ip || "Unknown IP"}</strong>
+          <strong>
+            {a.source_ip || a.ip || "Unknown IP"}
+          </strong>
 
           {" → "}
 

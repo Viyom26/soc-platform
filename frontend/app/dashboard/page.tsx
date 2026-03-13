@@ -262,7 +262,7 @@ export default function DashboardPage() {
 
   if (loading) {
     return (
-      <div className="dashboard">
+      <div className="dashboard max-w-[1500px] mx-auto">
         <p className="muted">Loading Command Center...</p>
       </div>
     );

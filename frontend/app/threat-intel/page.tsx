@@ -102,7 +102,7 @@ if (Array.isArray(json)) {
   }
 
   return (
-    <div className="threat-container">
+    <div className="threat-container max-w-[1500px] mx-auto">
       <div className="threat-header">
         <h1>Threat Intelligence Center</h1>
 

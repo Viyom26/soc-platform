@@ -10,6 +10,7 @@ export default function ClientLayout({
 }: {
   children: React.ReactNode;
 }) {
+
   const router = useRouter();
   const pathname = usePathname();
 
@@ -20,6 +21,7 @@ export default function ClientLayout({
     pathname === "/login" || pathname === "/register";
 
   /* ================= AUTH CHECK ================= */
+
   useEffect(() => {
 
     if (typeof window === "undefined") return;
@@ -30,6 +32,7 @@ export default function ClientLayout({
   }, [pathname]);
 
   /* ================= REDIRECT CONTROL ================= */
+
   useEffect(() => {
 
     if (authenticated === null) return;
@@ -45,6 +48,7 @@ export default function ClientLayout({
   }, [authenticated, isAuthPage, router]);
 
   /* ================= LOAD SAVED THEME ================= */
+
   useEffect(() => {
 
     if (typeof window === "undefined") return;
@@ -60,6 +64,7 @@ export default function ClientLayout({
   }, []);
 
   /* ================= TOGGLE THEME ================= */
+
   function toggleTheme() {
 
     const newTheme = theme === "dark" ? "light" : "dark";
@@ -73,16 +78,20 @@ export default function ClientLayout({
   }
 
   /* ================= LOADING STATE ================= */
+
   if (authenticated === null) return null;
 
   /* ================= AUTH PAGES ================= */
+
   if (!authenticated) {
     return <>{children}</>;
   }
 
   /* ================= MAIN LAYOUT ================= */
+
   return (
     <AlertProvider>
+
       <div className="enterprise-container">
 
         <Sidebar />
@@ -90,9 +99,14 @@ export default function ClientLayout({
         <main className="enterprise-content with-sidebar">
 
           {/* TOP BAR */}
+
           <div className="topbar-fixed">
+
             <div className="topbar-inner">
-              <h1 className="app-title">AttackSurface SOC</h1>
+
+              <h1 className="app-title">
+                AttackSurface SOC
+              </h1>
 
               <button
                 onClick={toggleTheme}
@@ -100,17 +114,28 @@ export default function ClientLayout({
               >
                 {theme === "dark" ? "Light Mode" : "Dark Mode"}
               </button>
+
             </div>
+
           </div>
 
           {/* PAGE CONTENT */}
+
           <div className="page-content">
-            {children}
+
+            <div className="page-inner-container">
+
+              {children}
+
+            </div>
+
           </div>
 
         </main>
 
       </div>
+
     </AlertProvider>
   );
+
 }

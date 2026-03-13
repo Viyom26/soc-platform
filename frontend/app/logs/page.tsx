@@ -139,7 +139,7 @@ export default function LogsPage() {
   };
 
   return (
-    <div className="logs-page">
+    <div className="logs-page max-w-[1500px] mx-auto">
 
       <h1 className="page-title">Log Parser</h1>
 

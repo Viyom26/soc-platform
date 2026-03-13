@@ -118,3 +118,30 @@ html.light .enterprise-topbar {
   background: #ffffff;
   border-bottom: 1px solid #e5e7eb;
 }
+
+:root {
+  --sidebar-width: 260px;
+}
+
+.enterprise-container {
+  display: flex;
+  width: 100%;
+  min-height: 100vh;
+}
+
+.enterprise-content {
+  flex: 1;
+  margin-left: var(--sidebar-width);
+  transition: margin-left 0.25s ease;
+  width: calc(100% - var(--sidebar-width));
+}
+
+.page-content {
+  padding: 110px 30px 40px 30px;
+}
+
+.page-inner-container {
+  max-width: 1500px;
+  margin: 0 auto;
+  width: 100%;
+}

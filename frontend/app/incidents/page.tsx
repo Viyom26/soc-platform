@@ -120,7 +120,7 @@ export default function IncidentsPage() {
   }
 
   return (
-    <div className="incidents-page">
+    <div className="incidents-page max-w-[1500px] mx-auto">
       <h1 className="page-title">Incidents</h1>
 
       <div className="incident-stats">

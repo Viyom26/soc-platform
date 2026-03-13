@@ -25,6 +25,7 @@ type IPResult = {
 };
 
 export default function IPAnalyzerPage() {
+
   const [ipInput, setIpInput] = useState("");
   const [results, setResults] = useState<IPResult[]>([]);
   const [loading, setLoading] = useState(false);
@@ -33,8 +34,6 @@ export default function IPAnalyzerPage() {
   useEffect(() => {
     apiFetch("/auth/me").catch(() => {});
   }, []);
-
-  /* ================= PRIVATE IP DETECTION ================= */
 
   function isPrivateIP(ip: string) {
     const parts = ip.split(".");
@@ -67,6 +66,7 @@ export default function IPAnalyzerPage() {
   }
 
   async function analyzeIp() {
+
     const ips = ipInput
       .split(/[\s,]+/)
       .map((ip) => ip.trim())
@@ -79,13 +79,15 @@ export default function IPAnalyzerPage() {
     setResults([]);
 
     try {
-      const data = await apiFetch("/api/ip/analyze", {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ ips }),
-});
 
-setResults(Array.isArray(data) ? data : []);
+      const data = await apiFetch("/api/ip/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ips }),
+      });
+
+      setResults(Array.isArray(data) ? data : []);
+
     } catch {
       setError("Failed to analyze IP(s).");
     } finally {
@@ -112,11 +114,15 @@ setResults(Array.isArray(data) ? data : []);
   }
 
   return (
-    <div className="ip-analyzer-page">
+
+    <div className="ip-analyzer-page max-w-[1400px] mx-auto">
+
       <h1 className="page-title">🧠 IP Analyzer</h1>
 
       <div className="ip-card">
+
         <div className="ip-input-group">
+
           <textarea
             className="ip-input"
             placeholder="Enter one or multiple IPs (space or comma separated)"
@@ -132,20 +138,25 @@ setResults(Array.isArray(data) ? data : []);
           >
             {loading ? "Analyzing..." : "Analyze"}
           </button>
+
         </div>
 
         {error && <div className="error-text">{error}</div>}
 
         {sortedResults.map((result) => (
+
           <div
             key={result.ip}
             className="result-card"
             style={{ borderLeft: riskBorder(result.risk) }}
           >
+
             <div className="result-header">
+
               <h3>Threat Intelligence Report</h3>
 
               <div className="header-right">
+
                 <span className={riskClass(result.risk)}>
                   {result.risk}
                 </span>
@@ -155,10 +166,13 @@ setResults(Array.isArray(data) ? data : []);
                     🚫 BLACKLISTED
                   </span>
                 )}
+
               </div>
+
             </div>
 
             <div className="result-grid">
+
               <div>
                 <strong>IP Address</strong>
                 <span
@@ -219,12 +233,19 @@ setResults(Array.isArray(data) ? data : []);
                 <strong>VT Suspicious</strong>
                 <span>{result.virustotal?.suspicious ?? 0}</span>
               </div>
+
             </div>
+
           </div>
+
         ))}
 
         <HistoryPanel pageFilter="ip-analyzer" enableRiskFilter />
+
       </div>
+
     </div>
+
   );
+
 }

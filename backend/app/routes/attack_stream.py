@@ -11,6 +11,7 @@ class ConnectionManager:
         self.active_connections: List[WebSocket] = []
 
     async def connect(self, websocket: WebSocket):
+
         await websocket.accept()
 
         if websocket not in self.active_connections:
@@ -32,12 +33,15 @@ class ConnectionManager:
         for connection in self.active_connections:
 
             try:
+
                 await connection.send_json(message)
 
             except Exception as e:
+
                 print("Broadcast failed:", e)
                 disconnected.append(connection)
 
+        # cleanup disconnected sockets
         for conn in disconnected:
             self.disconnect(conn)
 
@@ -45,15 +49,21 @@ class ConnectionManager:
 manager = ConnectionManager()
 
 
+# =====================================================
+# LIVE ATTACK STREAM SOCKET
+# =====================================================
+
 @router.websocket("/ws/attack-stream")
 async def attack_stream(websocket: WebSocket):
 
     await manager.connect(websocket)
 
     try:
+
         while True:
 
             try:
+
                 message = await asyncio.wait_for(
                     websocket.receive_text(),
                     timeout=30
@@ -63,6 +73,7 @@ async def attack_stream(websocket: WebSocket):
 
             except asyncio.TimeoutError:
 
+                # heartbeat ping
                 await websocket.send_json({
                     "type": "heartbeat",
                     "status": "alive"
@@ -72,12 +83,18 @@ async def attack_stream(websocket: WebSocket):
                 break
 
     except WebSocketDisconnect:
+
         manager.disconnect(websocket)
 
     except Exception as e:
+
         print("WebSocket error:", e)
         manager.disconnect(websocket)
 
+
+# =====================================================
+# ALERT STREAM SOCKET
+# =====================================================
 
 @router.websocket("/ws/alerts")
 async def alerts_socket(websocket: WebSocket):
@@ -85,9 +102,11 @@ async def alerts_socket(websocket: WebSocket):
     await manager.connect(websocket)
 
     try:
+
         while True:
 
             try:
+
                 message = await asyncio.wait_for(
                     websocket.receive_text(),
                     timeout=30
@@ -103,8 +122,10 @@ async def alerts_socket(websocket: WebSocket):
                 })
 
     except WebSocketDisconnect:
+
         manager.disconnect(websocket)
 
     except Exception as e:
+
         print("Alerts WebSocket error:", e)
         manager.disconnect(websocket)

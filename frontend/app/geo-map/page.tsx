@@ -70,7 +70,7 @@ export default function GeoMapPage() {
   }, [threats]);
 
   return (
-    <div className="min-h-screen bg-[#020617] text-white p-6">
+    <div className="min-h-screen bg-[#020617] text-white p-6 max-w-[1600px] mx-auto">
       <h1 className="text-2xl font-bold mb-6">
         SOC Global Threat Intelligence Map
       </h1>

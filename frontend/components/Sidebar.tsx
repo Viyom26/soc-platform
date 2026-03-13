@@ -158,7 +158,17 @@ export default function Sidebar() {
 
             <button
               className="collapse-btn"
-              onClick={() => setCollapsed(!collapsed)}
+              onClick={() => {
+                const newState = !collapsed;
+                setCollapsed(newState);
+
+                if (typeof document !== "undefined") {
+                  document.documentElement.style.setProperty(
+                    "--sidebar-width",
+                    newState ? "80px" : "260px"
+                );
+              }
+            }}
             >
               {collapsed ? "➡" : "⬅"}
             </button>
