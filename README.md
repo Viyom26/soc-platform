@@ -8,6 +8,19 @@ The goal of the platform is to simulate capabilities found in real **SIEM (Secur
 
 ---
 
+# Table of Contents
+
+* Features
+* Dashboard Preview
+* Architecture
+* Modules
+* Installation
+* Project Structure
+* Future Improvements
+* Author
+
+---
+
 # Features
 
 ### Core Security Monitoring
@@ -171,6 +184,12 @@ Backend API will run on:
 
 ```
 http://localhost:8000
+```
+
+API Documentation:
+
+```
+http://localhost:8000/docs
 ```
 
 ---
