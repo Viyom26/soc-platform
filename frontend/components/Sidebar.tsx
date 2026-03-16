@@ -24,6 +24,7 @@ export default function Sidebar() {
     const token = localStorage.getItem("access_token");
 
     if (!token) {
+      /* eslint-disable-next-line react-hooks/set-state-in-effect */
       setRole(null);
       return;
     }
@@ -44,13 +45,14 @@ export default function Sidebar() {
       if (decoded && decoded.role) {
         setRole(decoded.role);
       } else {
-        setRole(null);
+                setRole(null);
       }
 
     } catch (err) {
 
       console.warn("Token decode failed", err);
-      setRole(null);
+
+            setRole(null);
 
     }
 
@@ -93,8 +95,6 @@ export default function Sidebar() {
     { name: "Threat Intel", path: "/threat-intel", icon: "📊", roles: ["ADMIN", "ANALYST"] },
 
     { name: "Live Network", path: "/live-network", icon: "📡", roles: ["ADMIN", "ANALYST"] },
-
-    /* NEW SOC VISUALIZATION PAGE */
 
     { name: "Attack Map", path: "/attack-map", icon: "🌐", roles: ["ADMIN", "ANALYST"] },
 
@@ -166,9 +166,9 @@ export default function Sidebar() {
                   document.documentElement.style.setProperty(
                     "--sidebar-width",
                     newState ? "80px" : "260px"
-                );
-              }
-            }}
+                  );
+                }
+              }}
             >
               {collapsed ? "➡" : "⬅"}
             </button>
@@ -181,9 +181,9 @@ export default function Sidebar() {
 
             {menu
               .filter((item) => {
-  if (!role) return false;
-  return item.roles.includes(role);
-})
+                if (!role) return false;
+                return item.roles.includes(role);
+              })
               .map((item) => {
 
                 const active =

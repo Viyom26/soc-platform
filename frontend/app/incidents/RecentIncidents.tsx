@@ -3,21 +3,33 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 
+type Incident = {
+  id: string;
+  source_ip: string;
+  severity: string;
+  status: string;
+};
+
 export default function RecentIncidents() {
-  const [incidents, setIncidents] = useState<any[]>([]);
+
+  const [incidents, setIncidents] = useState<Incident[]>([]);
 
   const token =
-    typeof window !== "undefined" ? localStorage.getItem("token") : null;
+    typeof window !== "undefined"
+      ? localStorage.getItem("access_token")
+      : null;
 
   useEffect(() => {
+
     fetch("http://127.0.0.1:8000/incidents?limit=5", {
       headers: {
         Authorization: `Bearer ${token}`,
       },
     })
       .then((res) => res.json())
-      .then(setIncidents);
-  }, []);
+      .then((data: Incident[]) => setIncidents(data));
+
+  }, [token]);
 
   return (
     <div className="bg-zinc-900 p-4 rounded">
@@ -43,7 +55,9 @@ export default function RecentIncidents() {
                   {i.source_ip}
                 </Link>
               </td>
-              <td className="font-bold text-red-400">{i.severity}</td>
+              <td className="font-bold text-red-400">
+                {i.severity}
+              </td>
               <td>{i.status}</td>
             </tr>
           ))}

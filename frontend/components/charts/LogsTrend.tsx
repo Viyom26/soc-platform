@@ -10,21 +10,32 @@ import {
   ResponsiveContainer,
 } from "recharts";
 
+type LogItem = {
+  timestamp?: string;
+};
+
+type TrendPoint = {
+  time: string;
+  count: number;
+};
+
 export default function LogsTrend() {
-  const [data, setData] = useState<any[]>([]);
+  const [data, setData] = useState<TrendPoint[]>([]);
 
   useEffect(() => {
     fetch("http://127.0.0.1:8000/logs")
       .then((r) => r.json())
       .then((res) => {
-        const logs =
+        const logs: LogItem[] =
           res?.items || res?.data || (Array.isArray(res) ? res : []);
 
-        const grouped: any = {};
+        const grouped: Record<string, number> = {};
 
-        logs.forEach((l: any) => {
+        logs.forEach((l: LogItem) => {
           if (!l.timestamp) return;
+
           const hour = l.timestamp.slice(0, 13);
+
           grouped[hour] = (grouped[hour] || 0) + 1;
         });
 

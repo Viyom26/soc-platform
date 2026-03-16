@@ -15,6 +15,19 @@ type ThreatLevel = {
   level: string;
 };
 
+type LiveAlert = {
+  source_ip?: string;
+  severity?: string;
+  risk_score?: number;
+  type?: string;
+};
+
+type KPIProps = {
+  label: string;
+  value: number;
+  color: string;
+};
+
 export default function CommandCenter() {
 
   const [summary, setSummary] = useState<Summary>({
@@ -25,7 +38,7 @@ export default function CommandCenter() {
   });
 
   const [threatLevel, setThreatLevel] = useState<ThreatLevel | null>(null);
-  const [liveAlerts, setLiveAlerts] = useState<any[]>([]);
+  const [liveAlerts, setLiveAlerts] = useState<LiveAlert[]>([]);
   const [loading, setLoading] = useState(true);
   const [lastUpdate, setLastUpdate] = useState<string>("");
 
@@ -47,10 +60,14 @@ export default function CommandCenter() {
         low: data?.low_alerts ?? 0,
       });
 
-      setLastUpdate(new Date().toLocaleTimeString());
+      setLastUpdate(
+        new Date().toLocaleTimeString("en-IN", {
+          timeZone: "Asia/Kolkata",
+        })
+      );
 
-    } catch (err) {
-      console.warn("Summary load failed:", err);
+    } catch {
+      // silent fail
     }
   }, []);
 
@@ -62,8 +79,8 @@ export default function CommandCenter() {
       const data = await apiFetch("/api/soc/threat-level");
       setThreatLevel(data);
 
-    } catch (err) {
-      console.warn("Threat level load failed:", err);
+    } catch {
+      // silent fail
     }
   }, []);
 
@@ -110,30 +127,34 @@ export default function CommandCenter() {
 
       try {
 
-        console.log("Connecting to SOC WebSocket...");
+        const base =
+          process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
-        const socket = new WebSocket("ws://127.0.0.1:8000/ws/alerts");
+        const socket = new WebSocket(
+          base.replace("http", "ws") + "/ws/alerts"
+        );
+
         socketRef.current = socket;
 
-        socket.onopen = () => {
-          console.log("SOC socket connected");
-        };
+        socket.onopen = () => {};
 
         socket.onmessage = (event) => {
 
           try {
 
-            const data = JSON.parse(event.data);
+            const data: LiveAlert = JSON.parse(event.data);
 
             if (data?.type === "heartbeat") return;
 
-            setLiveAlerts(prev => {
-              const exists = prev.find(a =>
+            setLiveAlerts((prev) => {
+              const exists = prev.find((a) =>
                 a.source_ip === data.source_ip &&
                 a.risk_score === data.risk_score
               );
-              if (exists) return prev
-              return [data, ...prev.slice(0, 20)]
+
+              if (exists) return prev;
+
+              return [data, ...prev.slice(0, 20)];
             });
 
             if (data?.severity === "CRITICAL" && audioRef.current) {
@@ -142,18 +163,14 @@ export default function CommandCenter() {
             }
 
           } catch {
-            console.warn("Invalid socket message");
+            // ignore invalid socket message
           }
 
         };
 
-        socket.onerror = () => {
-          console.warn("WebSocket temporary issue");
-        };
+        socket.onerror = () => {};
 
         socket.onclose = () => {
-
-          console.log("Socket closed. Reconnecting...");
 
           socketRef.current = null;
 
@@ -163,8 +180,8 @@ export default function CommandCenter() {
 
         };
 
-      } catch (err) {
-        console.warn("Socket connection failed", err);
+      } catch {
+        // silent fail
       }
     }
 
@@ -209,13 +226,12 @@ export default function CommandCenter() {
     summary.low > 0;
 
   return (
-    <div className="min-h-screen text-white p-8 bg-[#020617]">
+    <div className="min-h-screen text-white p-8 bg-[#020617] max-w-[1400px] mx-auto">
 
       <h1 className="text-4xl font-bold mb-4">
         SOC Command Center
       </h1>
 
-      {/* LIVE STATUS */}
       <div className="text-sm text-gray-400 mb-6 flex items-center gap-2">
         <span className="text-green-400">● LIVE</span>
         <span>Last update: {lastUpdate}</span>
@@ -227,8 +243,6 @@ export default function CommandCenter() {
         </div>
       )}
 
-      {/* ================= SEVERITY ================= */}
-
       <div className="bg-slate-900 p-6 rounded-xl mb-10">
 
         <h2 className="text-lg mb-6 text-gray-300">
@@ -237,7 +251,7 @@ export default function CommandCenter() {
 
         {hasData ? (
           <>
-            <div className="grid grid-cols-4 gap-4 mb-8">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
               <KPI label="CRITICAL" value={summary.critical} color="text-red-500" />
               <KPI label="HIGH" value={summary.high} color="text-orange-400" />
               <KPI label="MEDIUM" value={summary.medium} color="text-yellow-400" />
@@ -253,8 +267,6 @@ export default function CommandCenter() {
         )}
 
       </div>
-
-      {/* ================= LIVE ALERTS ================= */}
 
       <div className="bg-slate-900 p-6 rounded-xl">
 
@@ -275,9 +287,9 @@ export default function CommandCenter() {
             <div key={index} className="p-3 rounded-md bg-slate-800">
 
               <div className="text-sm">
-                <div>Source: {alert.source_ip}</div>
-                <div className="font-semibold">Severity: {alert.severity}</div>
-                <div>Risk: {alert.risk_score}</div>
+                <div>Source: {alert.source_ip || "Unknown IP"}</div>
+                <div className="font-semibold">Severity: {alert.severity || "LOW"}</div>
+                <div>Risk: {alert.risk_score ?? 0}</div>
               </div>
 
             </div>
@@ -296,7 +308,7 @@ export default function CommandCenter() {
 
 /* ================= KPI CARD ================= */
 
-function KPI({ label, value, color }: any) {
+function KPI({ label, value, color }: KPIProps) {
 
   return (
     <div className="bg-slate-800 p-4 rounded-xl text-center">

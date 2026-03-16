@@ -10,17 +10,18 @@ export default function ThemeToggle() {
 
   /* ================= LOAD SAVED THEME ================= */
 
-  useEffect(() => {
-    const savedTheme =
-      (localStorage.getItem("theme") as Theme) || "dark";
+useEffect(() => {
+  const savedTheme =
+    (localStorage.getItem("theme") as Theme) || "dark";
 
-    setTheme(savedTheme);
+  /* eslint-disable-next-line react-hooks/set-state-in-effect */
+  setTheme(savedTheme);
 
-    document.documentElement.classList.remove("dark", "light");
-    document.documentElement.classList.add(savedTheme);
+  document.documentElement.classList.remove("dark", "light");
+  document.documentElement.classList.add(savedTheme);
 
-    setMounted(true);
-  }, []);
+  setMounted(true);
+}, []);
 
   /* ================= TOGGLE THEME ================= */
 

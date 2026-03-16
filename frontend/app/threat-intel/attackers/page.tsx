@@ -3,9 +3,15 @@
 import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api";
 
+type Attacker = {
+  ip: string;
+  attacks: number;
+  avg_risk: number;
+};
+
 export default function AttackersPage() {
 
-  const [data, setData] = useState<any[]>([]);
+  const [data, setData] = useState<Attacker[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -24,7 +30,9 @@ export default function AttackersPage() {
         setData([]);
 
       } finally {
+
         setLoading(false);
+
       }
 
     }
@@ -46,7 +54,7 @@ export default function AttackersPage() {
         <p>No attackers found.</p>
       )}
 
-      {data.map((item: any, index) => (
+      {data.map((item: Attacker, index) => (
 
         <div
           key={index}

@@ -5,12 +5,18 @@ import { useEffect, useState } from "react";
 
 const Globe = dynamic(() => import("react-globe.gl"), { ssr: false });
 
+type Alert = {
+  lat?: number;
+  lon?: number;
+  severity?: string;
+};
+
 type Attack = {
   startLat: number;
   startLng: number;
   endLat: number;
   endLng: number;
-  severity: string;
+  severity?: string;
 };
 
 type Ring = {
@@ -19,7 +25,7 @@ type Ring = {
 };
 
 type Props = {
-  liveAlerts: any[];
+  liveAlerts: Alert[];
   criticalCount?: number;
 };
 
@@ -33,7 +39,7 @@ export default function SOCGlobe({
   useEffect(() => {
     if (!liveAlerts?.length) return;
 
-    const newArcs: Attack[] = liveAlerts.map((alert: any) => ({
+    const newArcs: Attack[] = liveAlerts.map((alert: Alert) => ({
       startLat: alert.lat || 20,
       startLng: alert.lon || 78,
       endLat: 37.77,
@@ -41,13 +47,14 @@ export default function SOCGlobe({
       severity: alert.severity,
     }));
 
-    // Streaming arcs (keep last 20)
+    /* Streaming arcs (keep last 20) */
+    /* eslint-disable-next-line react-hooks/set-state-in-effect */
     setArcs((prev) => [...prev.slice(-20), ...newArcs]);
 
-    // Critical pulse rings
+    /* Critical pulse rings */
     const criticalRings: Ring[] = liveAlerts
-      .filter((a: any) => a.severity === "CRITICAL")
-      .map((a: any) => ({
+      .filter((a: Alert) => a.severity === "CRITICAL")
+      .map((a: Alert) => ({
         lat: a.lat || 20,
         lng: a.lon || 78,
       }));
@@ -66,13 +73,12 @@ export default function SOCGlobe({
 
         /* ATTACK ARCS */
         arcsData={arcs}
-        arcColor={(d: any) =>
-          d.severity === "CRITICAL"
-            ? ["#ff0000"]
-            : d.severity === "HIGH"
-            ? ["#ff8800"]
-            : ["#00ff00"]
-        }
+        arcColor={(d: unknown): string[] => {
+          const arc = d as Attack;
+          if (arc.severity === "CRITICAL") return ["#ff0000"];
+          if (arc.severity === "HIGH") return ["#ff8800"];
+          return ["#00ff00"];
+        }}
         arcDashLength={0.4}
         arcDashGap={4}
         arcDashAnimateTime={1000}

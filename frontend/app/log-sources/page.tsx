@@ -3,9 +3,17 @@
 import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api";
 
+type LogSource = {
+  id: string;
+  name: string;
+  source_type: string;
+  description?: string;
+  enabled: boolean;
+};
+
 export default function LogSources() {
 
-  const [sources, setSources] = useState<any[]>([]);
+  const [sources, setSources] = useState<LogSource[]>([]);
   const [name, setName] = useState("");
   const [type, setType] = useState("");
   const [desc, setDesc] = useState("");
@@ -32,7 +40,13 @@ export default function LogSources() {
   }
 
   useEffect(() => {
-    loadSources();
+
+    async function init() {
+      await loadSources();
+    }
+
+    init();
+
   }, []);
 
   async function addSource() {

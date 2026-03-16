@@ -17,6 +17,12 @@ type ParsedLog = {
   created_at?: string;
 };
 
+type LogsResponse =
+  | ParsedLog[]
+  | {
+      items?: ParsedLog[];
+    };
+
 export default function LogsPage() {
 
   const [rawText, setRawText] = useState("");
@@ -26,8 +32,8 @@ export default function LogsPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const safe = (val: any) =>
-    val === null || val === undefined || val === "" ? "N/A" : val;
+  const safe = (val: unknown) =>
+    val === null || val === undefined || val === "" ? "N/A" : String(val);
 
   /* ================= FETCH LOGS ================= */
 
@@ -35,16 +41,16 @@ export default function LogsPage() {
 
     try {
 
-      const data = await apiFetch("/logs");
+      const data: LogsResponse = await apiFetch("/logs");
 
       if (Array.isArray(data)) {
         setLogs(data);
         return data;
       }
 
-      if (data && Array.isArray((data as any).items)) {
-        setLogs((data as any).items);
-        return (data as any).items;
+      if (data && Array.isArray(data.items)) {
+        setLogs(data.items);
+        return data.items;
       }
 
       setLogs([]);
@@ -68,7 +74,7 @@ export default function LogsPage() {
 
   /* ================= PARSE LOGS ================= */
 
-  const convertLogs = async (e?: any) => {
+  const convertLogs = async (e?: React.MouseEvent<HTMLButtonElement>) => {
 
     if (e) e.preventDefault();
 
@@ -122,7 +128,7 @@ export default function LogsPage() {
       setFile(null);
       setFileName("");
 
-    } catch (e) {
+    } catch (e: unknown) {
 
       console.error("Parser error:", e);
 

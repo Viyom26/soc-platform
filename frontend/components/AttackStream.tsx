@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { apiFetch } from "@/lib/api";
 
 type Attack = {
@@ -57,7 +57,7 @@ export default function AttackStream() {
 
   /* ================= LOAD REAL ATTACK DATA ================= */
 
-  async function loadRealAttacks() {
+  const loadRealAttacks = useCallback(async () => {
 
     try {
 
@@ -82,7 +82,7 @@ export default function AttackStream() {
 
       setAttacks(mapped);
 
-    } catch (err) {
+    } catch {
 
       console.warn("Attack stream API failed, using demo mode");
 
@@ -93,12 +93,13 @@ export default function AttackStream() {
 
     }
 
-  }
+  }, []);
 
   /* ================= STREAM REFRESH ================= */
 
   useEffect(() => {
 
+    /* eslint-disable-next-line react-hooks/set-state-in-effect */
     loadRealAttacks();
 
     const interval = setInterval(() => {
@@ -107,7 +108,7 @@ export default function AttackStream() {
 
     return () => clearInterval(interval);
 
-  }, []);
+  }, [loadRealAttacks]);
 
   return (
     <div className="bg-slate-900 p-4 rounded-lg mt-6">

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import "./login.css";
 
 export default function LoginPage() {
+
   const router = useRouter();
 
   const [email, setEmail] = useState("");
@@ -13,6 +14,7 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
 
   async function login() {
+
     if (loading) return;
 
     setError("");
@@ -25,6 +27,7 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
+
       const body = new URLSearchParams();
       body.append("username", email.trim());
       body.append("password", password);
@@ -49,17 +52,29 @@ export default function LoginPage() {
 
       localStorage.setItem("access_token", data.access_token);
 
-      router.push("/dashboard"); // ✅ use push, not replace
-    } catch (e: any) {
-      setError(e.message || "Login failed");
+      router.push("/dashboard");
+
+    } catch (e: unknown) {
+
+      if (e instanceof Error) {
+        setError(e.message);
+      } else {
+        setError("Login failed");
+      }
+
     } finally {
+
       setLoading(false);
+
     }
+
   }
 
   return (
     <div className="login-container">
+
       <div className="login-card">
+
         <h1 className="login-title">🛡 AttackSurface SOC</h1>
 
         <p className="login-subtitle">
@@ -75,6 +90,7 @@ export default function LoginPage() {
             login();
           }}
         >
+
           <input
             type="email"
             placeholder="admin@example.com"
@@ -92,13 +108,16 @@ export default function LoginPage() {
           <button type="submit" disabled={loading}>
             {loading ? "Signing in..." : "Sign In"}
           </button>
+
         </form>
 
         <div className="login-footer">
           <span>New user?</span>
           <a href="/register">Create Account</a>
         </div>
+
       </div>
+
     </div>
   );
 }

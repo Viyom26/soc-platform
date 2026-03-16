@@ -21,24 +21,25 @@ type Threat = {
   country?: string;
 };
 
+type AttackFlow = {
+  from: [number, number];
+  to: [number, number];
+  risk: string;
+};
+
 export default function GeoMapPage() {
   const router = useRouter();
 
   const [threats, setThreats] = useState<Threat[]>([]);
   const [selected, setSelected] = useState<Threat | null>(null);
 
-  /* ================= LOAD REAL DATA ================= */
-
   useEffect(() => {
     async function load() {
       try {
         const data = await apiFetch("/api/geo/threats");
-
-        const safeThreats = Array.isArray(data) ? data : [];
-
+        const safeThreats: Threat[] = Array.isArray(data) ? data : [];
         setThreats(safeThreats);
-      } catch (err) {
-        console.error("Geo map load error:", err);
+      } catch {
         setThreats([]);
       }
     }
@@ -51,12 +52,10 @@ export default function GeoMapPage() {
   const geoUrl =
     "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json";
 
-  /* ================= CREATE LIVE ATTACK FLOWS ================= */
-
-  const attackFlows = useMemo(() => {
+  const attackFlows = useMemo<AttackFlow[]>(() => {
     if (threats.length < 2) return [];
 
-    const flows: any[] = [];
+    const flows: AttackFlow[] = [];
 
     for (let i = 0; i < threats.length - 1; i++) {
       flows.push({
@@ -82,7 +81,7 @@ export default function GeoMapPage() {
 
             <Geographies geography={geoUrl}>
               {({ geographies }) =>
-                geographies.map((geo) => (
+                geographies.map((geo: { rsmKey: string; properties: { name: string } }) => (
                   <Geography
                     key={geo.rsmKey}
                     geography={geo}
@@ -101,8 +100,6 @@ export default function GeoMapPage() {
               }
             </Geographies>
 
-            {/* ================= LIVE ATTACK FLOW LINES ================= */}
-
             {attackFlows.map((flow, i) => (
               <Line
                 key={i}
@@ -117,14 +114,8 @@ export default function GeoMapPage() {
                 }
                 strokeWidth={2}
                 strokeLinecap="round"
-                style={{
-                  opacity: 0.7,
-                  animation: "dashAttack 3s linear infinite",
-                }}
               />
             ))}
-
-            {/* ================= THREAT MARKERS ================= */}
 
             {threats.map((t) => (
               <Marker
@@ -133,14 +124,7 @@ export default function GeoMapPage() {
                 onClick={() => setSelected(t)}
               >
                 <>
-                  <circle
-                    r={10}
-                    fill="red"
-                    style={{
-                      animation: "pulseThreat 2s infinite",
-                      opacity: 0.5,
-                    }}
-                  />
+                  <circle r={10} fill="red" opacity={0.5} />
                   <circle
                     r={6}
                     fill={
@@ -158,12 +142,6 @@ export default function GeoMapPage() {
 
           </ZoomableGroup>
         </ComposableMap>
-
-        {threats.length === 0 && (
-          <div className="absolute inset-0 flex items-center justify-center text-slate-400">
-            No live threat intelligence data available.
-          </div>
-        )}
 
         {selected && (
           <div className="absolute top-0 right-0 w-80 h-full bg-[#0f172a] border-l border-slate-700 p-4">

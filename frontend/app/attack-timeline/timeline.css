@@ -3,18 +3,25 @@
   color: white;
 }
 
+/* main timeline container */
+
 .timeline {
   margin-top: 20px;
   border-left: 2px solid #334155;
   padding-left: 20px;
 }
 
+/* event block */
+
 .timeline-event {
   position: relative;
   margin-bottom: 20px;
   display: flex;
   gap: 16px;
+  align-items: flex-start;
 }
+
+/* timeline node */
 
 .timeline-event::before {
   content: "";
@@ -25,20 +32,30 @@
   height: 12px;
   background: #3b82f6;
   border-radius: 50%;
+  box-shadow: 0 0 6px rgba(59,130,246,0.6);
 }
+
+/* event info */
 
 .event-info {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  font-size: 14px;
 }
+
+/* severity badge */
 
 .severity {
   padding: 4px 8px;
   border-radius: 6px;
   font-size: 12px;
   font-weight: bold;
+  text-transform: uppercase;
+  width: fit-content;
 }
+
+/* severity colors */
 
 .severity.critical {
   background: #ef4444;

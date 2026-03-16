@@ -16,7 +16,6 @@ export default function AuditLogsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  // 🔎 Filters
   const [userFilter, setUserFilter] = useState("");
   const [actionFilter, setActionFilter] = useState("");
   const [search, setSearch] = useState("");
@@ -41,9 +40,12 @@ export default function AuditLogsPage() {
 
       setLogs(sorted);
       setError("");
-    } catch (err: any) {
+    } catch (err: unknown) {
+
       console.error("Audit load failed:", err);
+
       setError("Failed to load audit logs.");
+
     } finally {
       setLoading(false);
     }
@@ -82,7 +84,6 @@ export default function AuditLogsPage() {
       const matchesFrom =
         !dateFrom || logDate >= new Date(dateFrom);
 
-      // include full end day
       const matchesTo =
         !dateTo ||
         logDate <= new Date(dateTo + "T23:59:59");
@@ -97,7 +98,7 @@ export default function AuditLogsPage() {
     });
   }, [logs, userFilter, actionFilter, search, dateFrom, dateTo]);
 
-  /* ================= TIME FORMAT (FIXED) ================= */
+  /* ================= TIME FORMAT ================= */
 
   const formatTime = (time: string) => {
     try {
@@ -131,6 +132,7 @@ export default function AuditLogsPage() {
       {/* ================= FILTER BAR ================= */}
 
       <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
+
         <input
           type="text"
           placeholder="Search..."
@@ -168,6 +170,7 @@ export default function AuditLogsPage() {
           onChange={(e) => setDateTo(e.target.value)}
           className="p-2 rounded bg-slate-700 text-white"
         />
+
       </div>
 
       {/* ================= CONTENT ================= */}
@@ -195,6 +198,7 @@ export default function AuditLogsPage() {
             className="bg-slate-800 border border-slate-700 rounded-lg p-4 mb-4 shadow-md hover:border-cyan-500 transition"
           >
             <div className="flex justify-between items-center">
+
               <div className="font-medium text-white">
                 {log.user}
               </div>
@@ -202,9 +206,8 @@ export default function AuditLogsPage() {
               <div className="text-xs text-gray-400">
                 {formatTime(log.created_at)}
               </div>
-            </div>
 
-            {/* ACTION BADGE */}
+            </div>
 
             <div className="mt-2">
               <span className="px-3 py-1 text-sm font-semibold rounded bg-blue-600 text-white">
@@ -217,8 +220,10 @@ export default function AuditLogsPage() {
                 {log.details}
               </div>
             )}
+
           </div>
         ))}
+
     </div>
   );
 }

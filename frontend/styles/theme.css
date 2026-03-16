@@ -360,8 +360,13 @@ body.dark h1 {
   font-size: 32px;
   font-weight: 700;
   background: linear-gradient(90deg, #3b82f6, #06b6d4);
+
+  /* WebKit fallback */
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
+  
+  /* Standard property first */
+  background-clip: text;
 }
 
 /* =====================================================
@@ -517,12 +522,18 @@ body.dark .glass-card {
    LEVEL 7 – PAGE TITLE GLOW
 ========================================= */
 
-body.dark .page-title {
+body.dark .page-title,
+body.dark h1 {
   font-size: 32px;
   font-weight: 700;
-  background: linear-gradient(90deg,#3b82f6,#06b6d4);
+  background: linear-gradient(90deg, #3b82f6, #06b6d4);
+
+  /* WebKit fallback */
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
+  
+  /* Standard property first */
+  background-clip: text;
 }
 
 /* GLOBAL CARD HOVER GLOW */

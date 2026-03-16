@@ -2,7 +2,14 @@
 
 import Link from "next/link";
 
-export default function RecentAlertsTable({ logs }: { logs: any[] }) {
+type AlertLog = {
+  ip: string;
+  severity: string;
+  message: string;
+  timestamp: string;
+};
+
+export default function RecentAlertsTable({ logs }: { logs: AlertLog[] }) {
   return (
     <table width="100%" cellPadding={8}>
       <thead>
@@ -14,7 +21,7 @@ export default function RecentAlertsTable({ logs }: { logs: any[] }) {
         </tr>
       </thead>
       <tbody>
-        {logs.map((l, i) => (
+        {logs.map((l: AlertLog, i: number) => (
           <tr key={i}>
             <td>
               {l.ip !== "N/A" ? (

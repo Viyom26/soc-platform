@@ -3,8 +3,14 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 
+type Incident = {
+  id: string;
+  source_ip?: string;
+  severity?: string;
+};
+
 export default function RecentIncidents() {
-  const [incidents, setIncidents] = useState<any[]>([]);
+  const [incidents, setIncidents] = useState<Incident[]>([]);
 
   useEffect(() => {
     fetch("http://127.0.0.1:8000/incidents")

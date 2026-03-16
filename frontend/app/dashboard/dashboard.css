@@ -14,9 +14,14 @@
   font-weight: 700;
   margin-bottom: 40px;
   letter-spacing: 0.5px;
+
   background: linear-gradient(90deg, #3b82f6, #22d3ee);
+
   -webkit-background-clip: text;
+  background-clip: text;
+
   -webkit-text-fill-color: transparent;
+  color: transparent;
 }
 
 /* ================= STATS GRID ================= */

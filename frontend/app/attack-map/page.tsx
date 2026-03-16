@@ -22,6 +22,10 @@ type Attack = {
   risk_score?: number;
 };
 
+type GeographyType = {
+  rsmKey: string;
+};
+
 export default function AttackMapPage() {
 
   const [attacks, setAttacks] = useState<Attack[]>([]);
@@ -38,8 +42,10 @@ export default function AttackMapPage() {
           setAttacks(res);
         }
 
-      } catch (err) {
-        console.error("Attack map load error:", err);
+      } catch {
+
+        // silent error for production
+
       }
 
     };
@@ -54,7 +60,7 @@ export default function AttackMapPage() {
 
   return (
 
-    <div className="p-6 text-white">
+    <div className="p-6 text-white max-w-[1400px] mx-auto">
 
       <h1 className="text-2xl mb-4">
         Global Attack Map
@@ -67,8 +73,8 @@ export default function AttackMapPage() {
 
         <Geographies geography="https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json">
 
-          {({ geographies }) =>
-            geographies.map((geo) => (
+          {({ geographies }: { geographies: GeographyType[] }) =>
+            geographies.map((geo: GeographyType) => (
               <Geography
                 key={geo.rsmKey}
                 geography={geo}
@@ -102,6 +108,7 @@ export default function AttackMapPage() {
             <g key={i}>
 
               {/* Original attack line */}
+
               <Line
                 from={[a.source_lon, a.source_lat]}
                 to={[a.dest_lon, a.dest_lat]}
@@ -111,6 +118,7 @@ export default function AttackMapPage() {
               />
 
               {/* Moving attack beam */}
+
               <motion.circle
                 r={3}
                 fill={color}
@@ -143,9 +151,11 @@ export default function AttackMapPage() {
             >
 
               {/* Original marker */}
+
               <circle r={4} fill="#3b82f6" />
 
               {/* Pulsing effect */}
+
               <motion.circle
                 r={10}
                 fill="#3b82f6"

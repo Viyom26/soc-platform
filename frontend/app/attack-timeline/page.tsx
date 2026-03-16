@@ -4,9 +4,16 @@ import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api";
 import "./timeline.css";
 
+type TimelineEvent = {
+  ip?: string;
+  event?: string;
+  severity?: string;
+  time?: string;
+};
+
 export default function AttackTimeline() {
 
-  const [events, setEvents] = useState<any[]>([]);
+  const [events, setEvents] = useState<TimelineEvent[]>([]);
 
   useEffect(() => {
 
@@ -18,9 +25,8 @@ export default function AttackTimeline() {
 
         setEvents(Array.isArray(data) ? data : []);
 
-      } catch (err) {
+      } catch {
 
-        console.error("Timeline load failed", err);
         setEvents([]);
 
       }
@@ -33,23 +39,30 @@ export default function AttackTimeline() {
 
   return (
 
-    <div className="max-w-[1200px] mx-auto space-y-4">
+    <div className="timeline-page max-w-[1200px] mx-auto space-y-4">
 
       <h1>Attack Timeline</h1>
 
       <div className="timeline">
 
-        {events.map((e: any, i) => {
+        {events.map((e, i) => {
 
-          const severity =
-            (e?.severity || "LOW").toLowerCase();
+          /* Normalize severity */
+
+          const rawSeverity = e?.severity ?? "LOW";
+
+          const severityClass =
+            rawSeverity.toLowerCase() as "low" | "medium" | "high" | "critical";
+
+          const severityText =
+            rawSeverity.toUpperCase();
 
           return (
 
             <div key={i} className="timeline-event">
 
-              <div className={`severity ${severity}`}>
-                {e?.severity || "LOW"}
+              <div className={`severity ${severityClass}`}>
+                {severityText}
               </div>
 
               <div className="event-info">
@@ -60,7 +73,15 @@ export default function AttackTimeline() {
 
                 <div>
                   {e?.time
-                    ? new Date(e.time).toLocaleString()
+                    ? new Date(e.time).toLocaleString("en-IN", {
+                        timeZone: "Asia/Kolkata",
+                        day: "2-digit",
+                        month: "short",
+                        year: "numeric",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                        second: "2-digit"
+                      })
                     : "-"}
                 </div>
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 export default function Sidebar() {
   const router = useRouter();
@@ -15,11 +16,11 @@ export default function Sidebar() {
       <h2 className="logo">SOC Platform</h2>
 
       <nav className="nav">
-        <a href="/dashboard">Dashboard</a>
-        <a href="/logs">Logs Intelligence</a>
-        <a href="/alerts">Alerts</a>
-        <a href="/incidents">Incidents</a>
-        <a href="/reports">Reports</a>
+        <Link href="/dashboard">Dashboard</Link>
+        <Link href="/logs">Logs Intelligence</Link>
+        <Link href="/alerts">Alerts</Link>
+        <Link href="/incidents">Incidents</Link>
+        <Link href="/reports">Reports</Link>
       </nav>
 
       <button className="logout" onClick={logout}>

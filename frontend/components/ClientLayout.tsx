@@ -27,6 +27,8 @@ export default function ClientLayout({
     if (typeof window === "undefined") return;
 
     const token = localStorage.getItem("access_token");
+
+    /* eslint-disable-next-line react-hooks/set-state-in-effect */
     setAuthenticated(!!token);
 
   }, [pathname]);
@@ -56,6 +58,7 @@ export default function ClientLayout({
     const savedTheme =
       (localStorage.getItem("theme") as "dark" | "light") || "dark";
 
+    /* eslint-disable-next-line react-hooks/set-state-in-effect */
     setTheme(savedTheme);
 
     document.documentElement.classList.remove("dark", "light");

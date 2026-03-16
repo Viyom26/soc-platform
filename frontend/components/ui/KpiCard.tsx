@@ -1,18 +1,14 @@
 type Props = {
   title: string;
   value: string | number;
-  trend?: string;
+  change?: string;
 };
 
 export default function KpiCard({
   title,
   value,
   change,
-}: {
-  title: string;
-  value: string | number;
-  change?: string;
-}) {
+}: Props) {
   return (
     <div className="bg-white rounded-xl border shadow-sm p-5">
       <p className="text-sm text-slate-500">{title}</p>
