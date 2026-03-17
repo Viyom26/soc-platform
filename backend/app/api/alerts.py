@@ -6,7 +6,7 @@ from app.database import get_db
 from app.models.alert import Alert
 from app.services.mitre_mapper import map_mitre
 from app.services.risk_engine import risk_score
-from app.api.ws_alerts import manager
+from app.api.websocket import manager
 from app.services.ip_reputation import get_ip_reputation
 
 router = APIRouter()
@@ -77,11 +77,13 @@ async def create_alert(data: dict, db: Session = Depends(get_db)):
 
     # 7️⃣ Broadcast to WebSocket
     await manager.broadcast({
-    "source_ip": alert.source_ip,
-    "severity": alert.severity,
-    "risk_score": alert.risk_score,
-    "reputation": alert.reputation  # 🔥 ADD THIS
-})
+        "source_ip": alert.source_ip,
+        "severity": alert.severity,
+        "risk_score": alert.risk_score,
+        "reputation": alert.reputation
+    })
+
+    print("🔥 BROADCAST SENT:", alert.source_ip)
 
 
     return alert

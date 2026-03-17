@@ -24,7 +24,6 @@ export default function Sidebar() {
     const token = localStorage.getItem("access_token");
 
     if (!token) {
-      /* eslint-disable-next-line react-hooks/set-state-in-effect */
       setRole(null);
       return;
     }
@@ -32,28 +31,27 @@ export default function Sidebar() {
     try {
 
       const parts = token.split(".");
-
       if (parts.length < 2) {
         setRole(null);
         return;
       }
 
       const payloadBase64 = parts[1];
+      const decoded = JSON.parse(atob(payloadBase64)) as { role?: string };
 
-      const decoded = JSON.parse(atob(payloadBase64));
-
-      if (decoded && decoded.role) {
+      if (
+        decoded.role === "ADMIN" ||
+        decoded.role === "ANALYST" ||
+        decoded.role === "VIEWER"
+      ) {
         setRole(decoded.role);
       } else {
-                setRole(null);
+        setRole(null);
       }
 
     } catch (err) {
-
       console.warn("Token decode failed", err);
-
-            setRole(null);
-
+      setRole(null);
     }
 
   }, []);
@@ -61,65 +59,84 @@ export default function Sidebar() {
   /* ================= LOGOUT ================= */
 
   function handleLogout() {
-
     try {
       localStorage.removeItem("access_token");
     } catch {}
 
     window.location.href = "/login";
-
   }
 
-  /* ================= SIDEBAR MENU ================= */
+  /* ================= GROUPED MENU ================= */
 
-  const menu = [
+  const menuGroups = [
 
-    { name: "Dashboard", path: "/dashboard", icon: "🏠", roles: ["ADMIN", "ANALYST", "VIEWER"] },
+    {
+      title: "Overview",
+      items: [
+        { name: "Dashboard", path: "/dashboard", icon: "🏠", roles: ["ADMIN", "ANALYST", "VIEWER"] },
+        { name: "Command Center", path: "/command-center", icon: "🎯", roles: ["ADMIN"] },
+        { name: "Attack Map", path: "/attack-map", icon: "🌐", roles: ["ADMIN", "ANALYST"] },
+        { name: "Geo Map", path: "/geo-map", icon: "🗺️", roles: ["ADMIN", "ANALYST", "VIEWER"] },
+        { name: "Country Heatmap", path: "/country-heatmap", icon: "🌍", roles: ["ADMIN", "ANALYST", "VIEWER"] },
+      ],
+    },
 
-    { name: "Logs", path: "/logs", icon: "📜", roles: ["ADMIN", "ANALYST", "VIEWER"] },
+    {
+      title: "Monitoring",
+      items: [
+        { name: "Logs", path: "/logs", icon: "📜", roles: ["ADMIN", "ANALYST", "VIEWER"] },
+        { name: "Alerts", path: "/alerts", icon: "🚨", roles: ["ADMIN", "ANALYST", "VIEWER"] },
+        { name: "Incidents", path: "/incidents", icon: "📂", roles: ["ADMIN", "ANALYST"] },
+        { name: "Live Network", path: "/live-network", icon: "📡", roles: ["ADMIN", "ANALYST"] },
+        { name: "Live Attack Stream", path: "/live-attacks", icon: "⚡", roles: ["ADMIN","ANALYST"] },
+      ],
+    },
 
-    { name: "Alerts", path: "/alerts", icon: "🚨", roles: ["ADMIN", "ANALYST", "VIEWER"] },
+    {
+      title: "Detection & Intelligence",
+      items: [
+        { name: "Detection Rules", path: "/rules", icon: "📜", roles: ["ADMIN"] },
+        { name: "Threat Intel", path: "/threat-intel", icon: "📊", roles: ["ADMIN", "ANALYST"] },
+        { name: "MITRE Map", path: "/mitre-map", icon: "🧬", roles: ["ADMIN", "ANALYST"] },
+        { name: "IP Analyzer", path: "/ip-analyzer", icon: "🧠", roles: ["ADMIN", "ANALYST", "VIEWER"] },
 
-    { name: "Incidents", path: "/incidents", icon: "📂", roles: ["ADMIN", "ANALYST"] },
+        // 🔥 NEW FEATURES ADDED HERE
+        { name: "Threat Hunting", path: "/hunting", icon: "🕵️", roles: ["ADMIN", "ANALYST"] },
+        { name: "Advanced Search", path: "/search", icon: "🔍", roles: ["ADMIN", "ANALYST", "VIEWER"] },
+      ],
+    },
 
-    { name: "IP Analyzer", path: "/ip-analyzer", icon: "🧠", roles: ["ADMIN", "ANALYST", "VIEWER"] },
+    {
+      title: "Investigation",
+      items: [
+        { name: "Attack Timeline", path: "/attack-timeline", icon: "⏱", roles: ["ADMIN", "ANALYST"] },
+        { name: "Attack Flow", path: "/attack-flow", icon: "🧭", roles: ["ADMIN", "ANALYST"] },
+      ],
+    },
 
-    { name: "Geo Map", path: "/geo-map", icon: "🗺️", roles: ["ADMIN", "ANALYST", "VIEWER"] },
+    {
+      title: "Management",
+      items: [
+        { name: "Log Sources", path: "/log-sources", icon: "🖥", roles: ["ADMIN"] },
+        { name: "Compliance Reports", path: "/compliance", icon: "📑", roles: ["ADMIN"] },
+        { name: "Audit Logs", path: "/audit-logs", icon: "📁", roles: ["ADMIN"] },
 
-    { name: "Country Heatmap", path: "/country-heatmap", icon: "🌍", roles: ["ADMIN", "ANALYST", "VIEWER"] },
+        // 🔥 OPTIONAL ENTERPRISE FEATURE
+        { name: "Assets", path: "/assets", icon: "💻", roles: ["ADMIN", "ANALYST"] },
+      ],
+    },
 
-    { name: "Detection Rules", path: "/rules", icon: "📜", roles: ["ADMIN"] },
-
-    { name: "Attack Timeline", path: "/attack-timeline", icon: "⏱", roles: ["ADMIN", "ANALYST"] },
-
-    { name: "Threat Intel", path: "/threat-intel", icon: "📊", roles: ["ADMIN", "ANALYST"] },
-
-    { name: "Live Network", path: "/live-network", icon: "📡", roles: ["ADMIN", "ANALYST"] },
-
-    { name: "Attack Map", path: "/attack-map", icon: "🌐", roles: ["ADMIN", "ANALYST"] },
-
-    { name: "Attack Flow", path: "/attack-flow", icon: "🧭", roles: ["ADMIN", "ANALYST"] },
-
-    { name: "Log Sources", path: "/log-sources", icon: "🖥", roles: ["ADMIN"] },
-
-    { name: "Compliance Reports", path: "/compliance", icon: "📑", roles: ["ADMIN"] },
-
-    { name: "Live Attack Stream", path: "/live-attacks", icon: "⚡", roles: ["ADMIN","ANALYST"] },
-
-    { name: "MITRE Map", path: "/mitre-map", icon: "🧬", roles: ["ADMIN", "ANALYST"] },
-
-    { name: "AI Prediction", path: "/ai-prediction", icon: "🤖", roles: ["ADMIN"] },
-
-    { name: "Command Center", path: "/command-center", icon: "🎯", roles: ["ADMIN"] },
-
-    { name: "Audit Logs", path: "/audit-logs", icon: "📁", roles: ["ADMIN"] },
+    {
+      title: "Advanced",
+      items: [
+        { name: "AI Prediction", path: "/ai-prediction", icon: "🤖", roles: ["ADMIN"] },
+      ],
+    },
 
   ];
 
   return (
     <>
-
-      {/* ================= MOBILE TOGGLE ================= */}
 
       <button
         className="menu-toggle"
@@ -135,15 +152,11 @@ export default function Sidebar() {
         />
       )}
 
-      {/* ================= SIDEBAR ================= */}
-
       <aside
         className={`sidebar ${open ? "open" : ""} ${collapsed ? "collapsed" : ""}`}
       >
 
         <div>
-
-          {/* ================= HEADER ================= */}
 
           <div className="sidebar-header">
 
@@ -175,51 +188,58 @@ export default function Sidebar() {
 
           </div>
 
-          {/* ================= NAVIGATION ================= */}
-
           <nav className="sidebar-nav">
 
-            {menu
-              .filter((item) => {
-                if (!role) return false;
-                return item.roles.includes(role);
-              })
-              .map((item) => {
+            {menuGroups.map((group) => (
 
-                const active =
-                  pathname === item.path ||
-                  pathname?.startsWith(item.path + "/");
+              <div key={group.title} className="sidebar-group">
 
-                return (
+                {!collapsed && (
+                  <div className="sidebar-group-title">
+                    {group.title}
+                  </div>
+                )}
 
-                  <Link
-                    key={item.path}
-                    href={item.path}
-                    onClick={() => setOpen(false)}
-                    className={
-                      active
-                        ? "sidebar-link active"
-                        : "sidebar-link"
-                    }
-                  >
+                {group.items
+                  .filter((item) => !role || item.roles.includes(role))
+                  .map((item) => {
 
-                    <span>{item.icon}</span>
+                    const active =
+                      pathname === item.path ||
+                      pathname?.startsWith(item.path + "/");
 
-                    {!collapsed && (
-                      <span>{item.name}</span>
-                    )}
+                    return (
 
-                  </Link>
+                      <Link
+                        key={item.path}
+                        href={item.path}
+                        onClick={() => setOpen(false)}
+                        className={
+                          active
+                            ? "sidebar-link active"
+                            : "sidebar-link"
+                        }
+                      >
 
-                );
+                        <span>{item.icon}</span>
 
-              })}
+                        {!collapsed && (
+                          <span>{item.name}</span>
+                        )}
+
+                      </Link>
+
+                    );
+
+                  })}
+
+              </div>
+
+            ))}
 
           </nav>
 
         </div>
-
-        {/* ================= FOOTER ================= */}
 
         <div className="sidebar-footer">
 
@@ -236,5 +256,4 @@ export default function Sidebar() {
 
     </>
   );
-
 }

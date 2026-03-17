@@ -5,40 +5,50 @@ import { useParams } from "next/navigation";
 import { apiFetch } from "@/lib/api";
 import Card from "@/components/ui/Card";
 
+type TimelineEvent = {
+  message?: string;
+  severity?: string;
+  timestamp?: string;
+  mitre_tactic?: string;
+  mitre_technique?: string;
+};
+
+type Intel = {
+  country?: string;
+  isp?: string;
+  reputation?: number;
+  risk_score?: number;
+  related_incidents?: number;
+  first_seen?: string;
+  last_seen?: string;
+};
+
+type Comment = {
+  comment: string;
+  created_at: string;
+};
+
 export default function IncidentTimeline() {
 
   const params = useParams();
-
-  // ensure IP string
   const ip = Array.isArray(params?.id) ? params.id[0] : params?.id;
 
-  // DEBUG
-  console.log("Incident page IP:", ip);
-
-  const [timeline, setTimeline] = useState<any[]>([]);
+  const [timeline, setTimeline] = useState<TimelineEvent[]>([]);
   const [loading, setLoading] = useState(true);
-  const [intel, setIntel] = useState<any>(null);
+  const [intel, setIntel] = useState<Intel | null>(null);
 
-  const [comments, setComments] = useState<any[]>([]);
+  const [comments, setComments] = useState<Comment[]>([]);
   const [text, setText] = useState("");
 
-  // detect private/internal IP
   const isPrivate =
     ip?.startsWith("10.") ||
     ip?.startsWith("192.168.") ||
     ip?.startsWith("172.");
 
-  // helper for formatting time
   const formatTime = (t: string) => {
     try {
       return new Date(t).toLocaleString("en-IN", {
         timeZone: "Asia/Kolkata",
-        day: "2-digit",
-        month: "short",
-        year: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit"
       });
     } catch {
       return t;
@@ -53,27 +63,16 @@ export default function IncidentTimeline() {
 
       try {
 
-        console.log("Loading timeline for IP:", ip);
-
         const timelineData = await apiFetch(`/api/incidents/${ip}/timeline`);
         const intelData = await apiFetch(`/api/ip-intel/${ip}`);
         const commentData = await apiFetch(`/comments/${ip}`);
 
-        console.log("Timeline API response:", timelineData);
-
         setIntel(intelData);
-
         setComments(Array.isArray(commentData) ? commentData : []);
+        setTimeline(Array.isArray(timelineData) ? timelineData : []);
 
-        if (Array.isArray(timelineData)) {
-          setTimeline(timelineData);
-        } else {
-          setTimeline([]);
-        }
+      } catch {
 
-      } catch (err) {
-
-        console.error("Timeline load failed:", err);
         setTimeline([]);
 
       } finally {
@@ -89,7 +88,6 @@ export default function IncidentTimeline() {
   }, [ip]);
 
   async function addComment() {
-
     if (!text.trim() || !ip) return;
 
     try {
@@ -106,7 +104,6 @@ export default function IncidentTimeline() {
     } catch (err) {
       console.error("Comment add failed", err);
     }
-
   }
 
   return (
@@ -114,7 +111,6 @@ export default function IncidentTimeline() {
       <h2 className="text-xl font-semibold">Incident Timeline</h2>
       <p className="text-sm text-slate-500">{ip}</p>
 
-      {/* IP Intelligence Panel */}
       {intel && (
         <div className="glass-card mb-4 p-4">
 
@@ -124,103 +120,72 @@ export default function IncidentTimeline() {
 
           <div className="grid grid-cols-2 gap-4 text-sm">
 
-            <p>
-              <b>Country:</b>{" "}
-              {intel.country || (isPrivate ? "Internal Network" : "Unknown")}
-            </p>
-
-            <p>
-              <b>ISP:</b>{" "}
-              {intel.isp || (isPrivate ? "Internal Infrastructure" : "Unknown")}
-            </p>
-
-            <p>
-              <b>Reputation:</b>{" "}
-              {intel.reputation ?? (isPrivate ? "Internal Host" : "Unknown")}
-            </p>
-
-            <p>
-              <b>Risk Score:</b>{" "}
-              {intel.risk_score ?? (isPrivate ? "Calculated by SOC" : "Unknown")}
-            </p>
-
-            <p>
-              <b>Related Incidents:</b>{" "}
-              {intel.related_incidents ?? 0}
-            </p>
-
-            <p>
-              <b>First Seen:</b>{" "}
-              {intel.first_seen ? formatTime(intel.first_seen) : "-"}
-            </p>
-
-            <p>
-              <b>Last Seen:</b>{" "}
-              {intel.last_seen ? formatTime(intel.last_seen) : "-"}
-            </p>
+            <p><b>Country:</b> {intel.country || (isPrivate ? "Internal Network" : "Unknown")}</p>
+            <p><b>ISP:</b> {intel.isp || (isPrivate ? "Internal Infrastructure" : "Unknown")}</p>
+            <p><b>Reputation:</b> {intel.reputation ?? (isPrivate ? "Internal Host" : "Unknown")}</p>
+            <p><b>Risk Score:</b> {intel.risk_score ?? (isPrivate ? "Calculated by SOC" : "Unknown")}</p>
+            <p><b>Related Incidents:</b> {intel.related_incidents ?? 0}</p>
+            <p><b>First Seen:</b> {intel.first_seen ? formatTime(intel.first_seen) : "-"}</p>
+            <p><b>Last Seen:</b> {intel.last_seen ? formatTime(intel.last_seen) : "-"}</p>
 
           </div>
 
         </div>
       )}
 
-      {/* Timeline */}
-      <Card>
+      <Card className="p-4">
 
         {loading ? (
-          <p className="text-sm text-slate-400">
-            Loading timeline...
-          </p>
+          <p className="text-sm text-slate-400">Loading timeline...</p>
         ) : timeline.length === 0 ? (
-          <p className="text-sm text-slate-400">
-            No timeline data available
-          </p>
+          <p className="text-sm text-slate-400">No timeline data available</p>
         ) : (
 
           <div className="space-y-4">
 
-            {timeline.map((e, i) => (
+            {timeline.map((e, i) => {
 
-              <div key={i} className="flex gap-4">
+              const sev = (e.severity || "").toUpperCase();
 
-                <div className="w-2 h-2 mt-2 rounded-full bg-slate-400" />
+              return (
+                <div key={i} className="flex gap-4">
 
-                <div>
+                  <div className="w-2 h-2 mt-2 rounded-full bg-slate-400" />
 
-                  <p className="text-sm">{e.message}</p>
+                  <div>
 
-                  {e.mitre_technique && (
-                    <p className="text-xs text-blue-400">
-                      MITRE: {e.mitre_tactic} ({e.mitre_technique})
-                    </p>
-                  )}
+                    <p className="text-sm">{e.message}</p>
 
-                  <span
-                    className={`text-xs font-semibold
-                    ${
-                      e.severity === "CRITICAL"
-                        ? "text-red-600"
-                        : e.severity === "HIGH"
-                        ? "text-red-500"
-                        : e.severity === "MEDIUM"
-                        ? "text-yellow-500"
-                        : "text-green-600"
-                    }`}
-                  >
-                    {e.severity}
-                  </span>
+                    {e.mitre_technique && (
+                      <p className="text-xs text-blue-400">
+                        MITRE: {e.mitre_tactic} ({e.mitre_technique})
+                      </p>
+                    )}
 
-                  {e.timestamp && (
-                    <p className="text-xs text-slate-400">
-                      {formatTime(e.timestamp)}
-                    </p>
-                  )}
+                    <span className={`text-xs font-semibold
+                      ${
+                        sev === "CRITICAL"
+                          ? "text-red-600"
+                          : sev === "HIGH"
+                          ? "text-red-500"
+                          : sev === "MEDIUM"
+                          ? "text-yellow-500"
+                          : "text-green-600"
+                      }`}>
+                      {sev}
+                    </span>
+
+                    {e.timestamp && (
+                      <p className="text-xs text-slate-400">
+                        {formatTime(e.timestamp)}
+                      </p>
+                    )}
+
+                  </div>
 
                 </div>
-
-              </div>
-
-            ))}
+              );
+            })}
 
           </div>
 
@@ -228,8 +193,7 @@ export default function IncidentTimeline() {
 
       </Card>
 
-      {/* Analyst Comments */}
-      <Card>
+      <Card className="p-4">
 
         <h3 className="text-lg font-semibold mb-2">
           Analyst Comments

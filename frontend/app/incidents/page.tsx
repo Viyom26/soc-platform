@@ -17,10 +17,16 @@ type Incident = {
   created_at?: string;
 };
 
+type Asset = {
+  ip?: string;
+  criticality?: string;
+};
+
 export default function IncidentsPage() {
 
   const [incidents, setIncidents] = useState<Incident[]>([]);
   const [loading, setLoading] = useState(true);
+  const [assets, setAssets] = useState<Asset[]>([]);
 
   const [counts, setCounts] = useState({
     CRITICAL: 0,
@@ -44,64 +50,61 @@ export default function IncidentsPage() {
     }
   }, []);
 
-  /* ================= LOAD INCIDENTS ================= */
+  /* ================= LOAD DATA ================= */
 
-  useEffect(() => {
+  async function loadData() {
 
-    async function loadData() {
+    try {
 
-      try {
+      const [incidentData, assetData] = await Promise.all([
+        apiFetch("/incidents"),
+        apiFetch("/api/assets")
+      ]);
 
-        const data = await apiFetch("/incidents");
+      const list: Incident[] = Array.isArray(incidentData) ? incidentData : [];
 
-        const list: Incident[] = Array.isArray(data) ? data : [];
+      setIncidents(list);
+      setAssets(Array.isArray(assetData) ? assetData : []);
 
-        setIncidents(list);
+      const severityCounts = {
+        CRITICAL: 0,
+        HIGH: 0,
+        MEDIUM: 0,
+        LOW: 0,
+      };
 
-        const severityCounts = {
-          CRITICAL: 0,
-          HIGH: 0,
-          MEDIUM: 0,
-          LOW: 0,
-        };
+      list.forEach((i: Incident) => {
+        const sev =
+          (i.severity || "").toUpperCase() as keyof typeof severityCounts;
 
-        list.forEach((i: Incident) => {
+        if (severityCounts[sev] !== undefined) {
+          severityCounts[sev]++;
+        }
+      });
 
-          const sev =
-            (i.severity || "").toUpperCase() as keyof typeof severityCounts;
+      setCounts(severityCounts);
 
-          if (severityCounts[sev] !== undefined) {
-            severityCounts[sev]++;
-          }
-
-        });
-
-        setCounts(severityCounts);
-
-      } catch (err) {
-
-        console.error("Failed to load incidents", err);
-
-      } finally {
-
-        setLoading(false);
-
-      }
-
+    } catch (err) {
+      console.error("Failed to load incidents", err);
+    } finally {
+      setLoading(false);
     }
 
+  }
+
+  useEffect(() => {
     loadData();
-
     const interval = setInterval(loadData, 15000);
-
     return () => clearInterval(interval);
-
   }, []);
 
   /* ================= HELPERS ================= */
 
-  function rowClass(severity?: string) {
+  function getAsset(ip: string) {
+    return assets.find(a => a.ip === ip);
+  }
 
+  function rowClass(severity?: string) {
     const s = (severity || "").toUpperCase();
 
     if (s === "CRITICAL") return "row-critical";
@@ -110,15 +113,26 @@ export default function IncidentsPage() {
     if (s === "LOW") return "row-low";
 
     return "";
-
   }
 
-  async function assignOwner(id?: string) {
+  /* ================= STATUS COLORS ================= */
 
+  const statusColor: Record<string, string> = {
+    OPEN: "text-red-500",
+    INVESTIGATING: "text-yellow-400",
+    CONTAINED: "text-orange-400",
+    RESOLVED: "text-green-400",
+    CLOSED: "text-gray-400",
+    BLOCKED: "text-red-700",
+    ISOLATED: "text-purple-400",
+  };
+
+  /* ================= ACTIONS ================= */
+
+  async function assignOwner(id?: string) {
     if (!id) return;
 
     try {
-
       await apiFetch(`/api/incidents/${id}/assign`, {
         method: "PATCH",
         body: JSON.stringify({
@@ -127,34 +141,51 @@ export default function IncidentsPage() {
       });
 
       alert("Incident assigned");
+      loadData();
 
     } catch (err) {
-
       console.error("Assign failed", err);
-
     }
-
   }
 
   async function updateStatus(id?: string, status?: string) {
-
     if (!id) return;
 
     try {
-
       await apiFetch(`/api/incidents/${id}/status`, {
         method: "PATCH",
         body: JSON.stringify({ status }),
       });
 
-      console.log("Status updated");
+      loadData();
 
     } catch (err) {
-
       console.error("Status update failed", err);
-
     }
+  }
 
+  async function blockIP(ip: string) {
+    try {
+      await apiFetch("/actions/block-ip", {
+        method: "POST",
+        body: JSON.stringify({ ip }),
+      });
+      loadData();
+    } catch (err) {
+      console.error("Block failed", err);
+    }
+  }
+
+  async function isolateHost(ip: string) {
+    try {
+      await apiFetch("/actions/isolate-host", {
+        method: "POST",
+        body: JSON.stringify({ host: ip }),
+      });
+      loadData();
+    } catch (err) {
+      console.error("Isolate failed", err);
+    }
   }
 
   /* ================= ACCESS CONTROL ================= */
@@ -198,25 +229,18 @@ export default function IncidentsPage() {
       <div className="glass-card">
 
         {loading ? (
-
           <p className="muted">Loading incidents...</p>
-
         ) : incidents.length === 0 ? (
-
           <div className="soc-card">
-
             <p className="empty-text text-center">
               🚫 No incidents found
             </p>
-
           </div>
-
         ) : (
 
           <table className="incidents-table">
 
             <thead>
-
               <tr>
                 <th>IP</th>
                 <th>Severity</th>
@@ -225,7 +249,6 @@ export default function IncidentsPage() {
                 <th>Created</th>
                 <th>Action</th>
               </tr>
-
             </thead>
 
             <tbody>
@@ -239,34 +262,42 @@ export default function IncidentsPage() {
                   "";
 
                 try {
-
                   if (ip.startsWith("http")) {
                     ip = new URL(ip).hostname;
                   }
-
                 } catch {}
+
+                const asset = getAsset(ip);
+                const isCritical = asset?.criticality === "CRITICAL";
 
                 return (
 
-                  <tr key={i.id || index} className={rowClass(i.severity)}>
+                  <tr
+                    key={i.id || index}
+                    className={
+                      isCritical
+                        ? "bg-red-900/40"
+                        : rowClass(i.severity)
+                    }
+                  >
 
                     <td>
-
                       {ip ? (
+                        <>
+                          <Link
+                            href={`/incidents/${encodeURIComponent(ip)}`}
+                            className="incident-ip-link"
+                          >
+                            {ip}
+                          </Link>
 
-                        <Link
-                          href={`/incidents/${encodeURIComponent(ip)}`}
-                          className="incident-ip-link"
-                        >
-                          {ip}
-                        </Link>
-
-                      ) : (
-
-                        "-"
-
-                      )}
-
+                          {isCritical && (
+                            <span className="ml-2 text-red-500 font-bold">
+                              🚨 CRITICAL
+                            </span>
+                          )}
+                        </>
+                      ) : "-"}
                     </td>
 
                     <td className={`severity-${(i.severity || "info").toLowerCase()}`}>
@@ -274,48 +305,50 @@ export default function IncidentsPage() {
                     </td>
 
                     <td>
-
                       <select
                         value={i.status || "OPEN"}
                         onChange={(e) => updateStatus(i.id, e.target.value)}
-                        className="status-select"
+                        className={`status-select ${statusColor[i.status || ""] || "text-gray-400"}`}
                       >
-
                         <option value="OPEN">OPEN</option>
                         <option value="INVESTIGATING">INVESTIGATING</option>
                         <option value="CONTAINED">CONTAINED</option>
                         <option value="RESOLVED">RESOLVED</option>
                         <option value="CLOSED">CLOSED</option>
-
                       </select>
-
                     </td>
 
                     <td>{i.owner || "-"}</td>
 
                     <td>
-
                       {i.created_at
                         ? new Date(i.created_at).toLocaleString("en-IN", {
                             timeZone: "Asia/Kolkata",
-                            day: "2-digit",
-                            month: "short",
-                            year: "numeric",
-                            hour: "2-digit",
-                            minute: "2-digit",
-                            second: "2-digit"
                           })
                         : "-"}
-
                     </td>
 
-                    <td>
+                    <td className="flex gap-2">
 
                       <button
                         className="assign-btn"
                         onClick={() => assignOwner(i.id)}
                       >
-                        Assign Me
+                        Assign
+                      </button>
+
+                      <button
+                        className="bg-red-600 px-2 py-1 rounded text-white"
+                        onClick={() => blockIP(ip)}
+                      >
+                        🚫
+                      </button>
+
+                      <button
+                        className="bg-yellow-500 px-2 py-1 rounded text-black"
+                        onClick={() => isolateHost(ip)}
+                      >
+                        🔌
                       </button>
 
                     </td>

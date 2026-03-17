@@ -90,7 +90,7 @@ export default function AlertsPage() {
     loadAlerts();
 
     /* SOC REAL-TIME REFRESH */
-    const interval = setInterval(loadAlerts, 5000);
+    const interval = setInterval(loadAlerts, 10000); // 🔥 less load
 
     return () => clearInterval(interval);
 

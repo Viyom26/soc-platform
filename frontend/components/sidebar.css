@@ -151,3 +151,59 @@
   overflow-x: hidden;
   scrollbar-width: thin;
 }
+
+/* ===== SIDEBAR GROUP ===== */
+.sidebar-group {
+  margin-bottom: 20px;
+}
+
+/* ===== GROUP TITLE ===== */
+.sidebar-group-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: #94a3b8;
+  padding: 8px 12px;
+  margin-top: 10px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+/* ===== LINKS ===== */
+.sidebar-link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  margin: 4px 8px;
+  border-radius: 8px;
+  color: #cbd5f5;
+  text-decoration: none;
+  transition: all 0.2s ease;
+}
+
+/* ===== HOVER ===== */
+.sidebar-link:hover {
+  background: #1e293b;
+}
+
+/* ===== ACTIVE ===== */
+.sidebar-link.active {
+  background: linear-gradient(90deg, #2563eb, #1d4ed8);
+  color: white;
+  font-weight: 500;
+}
+
+/* ===== ICON ALIGNMENT ===== */
+.sidebar-link span:first-child {
+  font-size: 18px;
+}
+
+/* ===== TEXT ===== */
+.sidebar-link span:last-child {
+  font-size: 14px;
+}
+
+/* ===== COLLAPSED FIX ===== */
+.sidebar.collapsed .sidebar-link {
+  justify-content: center;
+}

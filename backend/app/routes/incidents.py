@@ -5,6 +5,7 @@ from app.models.threat_log import ThreatLog
 from app.models.incident import Incident
 from app.security import require_role
 from datetime import datetime
+from app.services.audit_service import log_action
 
 router = APIRouter(
     prefix="/api/incidents",
@@ -27,7 +28,16 @@ def assign_incident(
         return {"error": "Incident not found"}
 
     incident.owner = payload.get("owner")
+    incident.updated_at = datetime.utcnow()  # ✅ NEW
     db.commit()
+
+    log_action(
+        db,
+        "INCIDENT_ASSIGN",
+        user["sub"],
+        details=f"Incident assigned to {payload.get('owner')}",
+        page="incidents"
+    )
 
     return {"message": "Owner assigned"}
 
@@ -47,8 +57,27 @@ def update_status(
     if not incident:
         return {"error": "Incident not found"}
 
-    incident.status = payload.get("status")
+    new_status = payload.get("status")
+
+    if not new_status:
+        return {"error": "Status required"}
+
+    incident.status = new_status
+    incident.updated_at = datetime.utcnow()  # ✅ NEW
+
+    # ✅ AUTO CLOSE TIME
+    if new_status == "CLOSED":
+        incident.closed_at = datetime.utcnow()
+
     db.commit()
+
+    log_action(
+        db,
+        "INCIDENT_STATUS_UPDATE",
+        user["sub"],
+        details=f"Incident status updated to {new_status}",
+        page="incidents"
+    )
 
     return {"message": "Status updated"}
 
@@ -69,6 +98,7 @@ def get_incident_timeline(
         db.query(ThreatLog)
         .filter(ThreatLog.source_ip == ip)
         .order_by(ThreatLog.created_at.asc())
+        .limit(200)
         .all()
     )
 
@@ -76,6 +106,7 @@ def get_incident_timeline(
         db.query(Incident)
         .filter(Incident.source_ip == ip)
         .order_by(Incident.created_at.asc())
+        .limit(50)
         .all()
     )
 
@@ -110,7 +141,7 @@ def get_incident_timeline(
         timeline.append({
             "type": "incident",
             "ip": ip,
-            "message": "INCIDENT CREATED",
+            "message": f"INCIDENT {inc.status}",  # ✅ UPDATED
             "severity": getattr(inc, "severity", "INFO"),
             "timestamp": timestamp,
         })

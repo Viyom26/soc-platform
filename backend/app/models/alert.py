@@ -25,4 +25,4 @@ class Alert(Base):
 
     status = Column(String, default="Open")
 
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)

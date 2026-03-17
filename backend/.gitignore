@@ -2,14 +2,18 @@
 *.db-shm
 *.db-wal
 *.db-journal
+*.db
 
 # Python virtual environment
 venv/
 .venv/
+env/
 
 # Python cache
 __pycache__/
 *.pyc
+*.pyo
+*.pyd
 
 # Node modules
 node_modules/
@@ -49,9 +53,28 @@ Thumbs.db
 build/
 dist/
 *.egg-info/
+*.egg
 
 # ===============================
 # IDE files
 # ===============================
 .vscode/
 .idea/
+
+# ===============================
+# Test / coverage
+# ===============================
+.pytest_cache/
+.coverage
+htmlcov/
+
+# ===============================
+# Migrations / temp
+# ===============================
+alembic/versions/*.pyc
+
+# ===============================
+# Misc
+# ===============================
+*.swp
+*.swo

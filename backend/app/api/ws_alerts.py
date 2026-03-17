@@ -34,7 +34,7 @@ class ConnectionManager:
 manager = ConnectionManager()
 
 
-@router.websocket("/ws/alerts")
+@router.websocket("/ws/alerts-dev")  # ✅ changed
 async def alerts_socket(websocket: WebSocket):
 
     await manager.connect(websocket)

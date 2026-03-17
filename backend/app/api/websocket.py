@@ -18,17 +18,22 @@ class ConnectionManager:
         if websocket not in self.active_connections:
             self.active_connections.append(websocket)
 
-        print("✅ WebSocket connected")
+        print("✅ WebSocket connected | Total:", len(self.active_connections))
 
+        # 🔥 send last alerts (history replay)
         for alert in alert_history[-20:]:
-            await websocket.send_json(alert)
+            try:
+                await websocket.send_json(alert)
+            except Exception as e:
+                print("⚠️ Replay send failed:", e)
 
     def disconnect(self, websocket: WebSocket):
         if websocket in self.active_connections:
             self.active_connections.remove(websocket)
-            print("❌ WebSocket disconnected")
+            print("❌ WebSocket disconnected | Remaining:", len(self.active_connections))
 
     async def broadcast(self, message: dict):
+        print("📡 Broadcasting alert:", message)
 
         alert_history.append(message)
 
@@ -40,7 +45,8 @@ class ConnectionManager:
         for connection in self.active_connections:
             try:
                 await connection.send_json(message)
-            except Exception:
+            except Exception as e:
+                print("⚠️ Send failed:", e)
                 disconnected.append(connection)
 
         for ws in disconnected:
@@ -52,15 +58,25 @@ manager = ConnectionManager()
 
 @router.websocket("/ws/alerts")
 async def websocket_alerts(websocket: WebSocket):
+    print("🔥 WS ROUTE HIT")
+
     await manager.connect(websocket)
 
     try:
         while True:
-            try:
-                await asyncio.wait_for(websocket.receive_text(), timeout=30)
-            except asyncio.TimeoutError:
-                await websocket.send_json({"type": "heartbeat"})
+            # ✅ keep connection alive (NO sleep)
+            await websocket.receive_text()
+
     except WebSocketDisconnect:
+        print("❌ Client disconnected")
+        manager.disconnect(websocket)
+
+    except asyncio.CancelledError:
+        print("⚠️ WebSocket cancelled safely")
+        manager.disconnect(websocket)
+
+    except Exception as e:
+        print("❌ WebSocket ERROR:", e)
         manager.disconnect(websocket)
 
 

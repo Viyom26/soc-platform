@@ -13,11 +13,10 @@ def get_alerts(db: Session = Depends(get_db)):
     alerts = (
         db.query(Alert)
         .order_by(Alert.created_at.desc())
-        .limit(500)
+        .limit(200)  # 🔥 reduced from 500 (better performance)
         .all()
     )
 
-    # Convert SQLAlchemy objects safely
     result = []
 
     for alert in alerts:
@@ -27,7 +26,7 @@ def get_alerts(db: Session = Depends(get_db)):
             "severity": alert.severity,
             "message": alert.message,
             "mitre_technique": getattr(alert, "mitre_technique", None),
-            "created_at": alert.created_at
+            "created_at": alert.created_at.isoformat() if alert.created_at else None  # 🔥 fix
         })
 
     return result

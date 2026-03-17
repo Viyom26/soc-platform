@@ -29,13 +29,15 @@ export default function LogsPage() {
   const [file, setFile] = useState<File | null>(null);
   const [fileName, setFileName] = useState("");
   const [logs, setLogs] = useState<ParsedLog[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
   const safe = (val: unknown) =>
     val === null || val === undefined || val === "" ? "N/A" : String(val);
 
-  /* ================= FETCH LOGS ================= */
+  /* ================= NORMAL FETCH ================= */
 
   const fetchLogs = async () => {
 
@@ -62,6 +64,31 @@ export default function LogsPage() {
       setLogs([]);
       return [];
 
+    }
+
+  };
+
+  /* ================= SEARCH LOGS ================= */
+
+  const searchLogs = async () => {
+
+    try {
+
+      const data = await apiFetch(
+        `/logs/search?query=${searchQuery}&page=${page}`
+      );
+
+      if (Array.isArray(data)) {
+        setLogs(data);
+      } else if (!Array.isArray(data) && data?.items) {
+        setLogs(data.items);
+      } else {
+        setLogs([]);
+      }
+
+    } catch (err) {
+      console.error("Search error:", err);
+      setLogs([]);
     }
 
   };
@@ -205,6 +232,23 @@ export default function LogsPage() {
 
       </Card>
 
+      {/* 🔥 SEARCH BAR ADDED HERE */}
+
+      <div style={{ margin: "20px 0" }}>
+        <input
+          type="text"
+          placeholder="Search by IP or message..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") searchLogs();
+          }}
+          style={{ padding: "8px", width: "250px", marginRight: "10px" }}
+        />
+
+        <button onClick={searchLogs}>Search</button>
+      </div>
+
       <Card title="Parsed Output">
 
         {!loading && logs.length === 0 && (
@@ -276,6 +320,32 @@ export default function LogsPage() {
         )}
 
       </Card>
+
+      {/* 🔥 PAGINATION ADDED */}
+
+      <div style={{ marginTop: "10px" }}>
+        <button
+          onClick={() => {
+            const newPage = Math.max(1, page - 1);
+            setPage(newPage);
+            setTimeout(searchLogs, 0);
+          }}
+        >
+          Prev
+        </button>
+
+        <span style={{ margin: "0 10px" }}>Page {page}</span>
+
+        <button
+          onClick={() => {
+            const newPage = page + 1;
+            setPage(newPage);
+            setTimeout(searchLogs, 0);
+          }}
+        >
+          Next
+        </button>
+      </div>
 
       <HistoryPanel pageFilter="logs" />
 

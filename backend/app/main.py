@@ -27,8 +27,8 @@ from app.routes import compliance
 from app.routes import attack_stream
 from app.routes import threat_intel
 from app.routes import live_network
-
-
+from app.routes.actions import router as actions_router
+from app.routes import hunting
 from app.security import (
     get_password_hash,
     verify_password,
@@ -36,7 +36,7 @@ from app.security import (
     get_current_user,
     require_role,
 )
-
+from app.routes import search
 from app.routes import ip_analyzer, logs, analytics, history, geo_map, audit
 from app.api.geo_ws import router as geo_ws_router
 from app.routes.incidents import router as incidents_router
@@ -46,10 +46,9 @@ from app.api.websocket import router as websocket_router
 from app.api.ip_combined import router as ip_combined_router
 from app.api.country_summary import router as country_summary_router
 from app.api.ai_prediction import router as ai_prediction_router
-
 from app.services.audit_service import log_action
-
-
+from app.routes import actions
+from app.routes import assets
 # ================= INIT =================
 
 Base.metadata.create_all(bind=engine)
@@ -132,12 +131,14 @@ app.include_router(attack_timeline.router)
 app.include_router(comments.router)
 
 app.include_router(log_sources.router)
-
+app.include_router(search.router)
 app.include_router(compliance.router)
-
+app.include_router(assets.router)
 app.include_router(attack_stream.router)
 app.include_router(threat_intel.router, prefix="/api")
 app.include_router(live_network.router, prefix="/api")
+app.include_router(hunting.router)
+app.include_router(actions.router)
 # ================= AUTH =================
 
 class RegisterSchema(BaseModel):

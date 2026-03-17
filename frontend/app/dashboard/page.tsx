@@ -176,6 +176,11 @@ export default function DashboardPage() {
 
       const grouped: Record<string, number> = {};
 
+      // initialize 24 hours
+      for (let i = 0; i < 24; i++) {
+        grouped[i.toString().padStart(2, "0")] = 0;
+      }
+
       logs.forEach((log: LogItem) => {
 
         if (!log.created_at) return;
@@ -185,18 +190,16 @@ export default function DashboardPage() {
           .toString()
           .padStart(2, "0");
 
-        grouped[hour] = (grouped[hour] || 0) + 1;
+        grouped[hour] += 1;
 
       });
 
-      const sortedTrend = Object.entries(grouped)
-        .sort(([a], [b]) => Number(a) - Number(b))
-        .map(([hour, count]) => ({
-          hour,
-          alerts: count,
-        }));
+      const sortedTrend = Object.entries(grouped).map(([hour, count]) => ({
+        hour,
+        alerts: count,
+    }));
 
-      setTrendData(sortedTrend);
+    setTrendData(sortedTrend);
 
     } catch (err) {
 
@@ -217,7 +220,7 @@ export default function DashboardPage() {
 
     loadDashboard();
 
-    const interval = setInterval(loadDashboard, 15000);
+    const interval = setInterval(loadDashboard, 30000); // 🔥 reduce load
 
     return () => clearInterval(interval);
 
