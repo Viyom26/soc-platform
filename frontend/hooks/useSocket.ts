@@ -1,18 +1,26 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 
 type SocketData = {
   type?: string;
   message?: string;
   severity?: string;
   risk_score?: number;
+  processed?: number;
+  total?: number;
 };
 
 export default function useSocket(onMessage: (data: SocketData) => void) {
+  const wsRef = useRef<WebSocket | null>(null);
+
   useEffect(() => {
-    let ws: WebSocket;
+    let reconnectTimeout: NodeJS.Timeout;
 
     const connect = () => {
-      ws = new WebSocket("ws://localhost:8000/ws/alerts");
+      // ✅ prevent multiple connections
+      if (wsRef.current) return;
+
+      const ws = new WebSocket("ws://localhost:8000/ws/alerts");
+      wsRef.current = ws;
 
       ws.onopen = () => {
         console.log("✅ WS Connected");
@@ -20,12 +28,25 @@ export default function useSocket(onMessage: (data: SocketData) => void) {
 
       ws.onmessage = (event) => {
         const data: SocketData = JSON.parse(event.data);
+
         onMessage(data);
+
+        if (data.type === "PROGRESS_UPDATE") {
+          window.dispatchEvent(
+            new CustomEvent("log-progress", {
+              detail: {
+                processed: data.processed || 0,
+                total: data.total || 0,
+              },
+            })
+          );
+        }
       };
 
       ws.onclose = () => {
         console.log("❌ WS Disconnected. Reconnecting...");
-        setTimeout(connect, 3000);
+        wsRef.current = null;
+        reconnectTimeout = setTimeout(connect, 3000);
       };
 
       ws.onerror = (err) => {
@@ -37,7 +58,11 @@ export default function useSocket(onMessage: (data: SocketData) => void) {
     connect();
 
     return () => {
-      if (ws) ws.close();
+      if (wsRef.current) {
+        wsRef.current.close();
+        wsRef.current = null;
+      }
+      if (reconnectTimeout) clearTimeout(reconnectTimeout);
     };
-  }, [onMessage]); // ✅ FIXED
+  }, [onMessage]);
 }

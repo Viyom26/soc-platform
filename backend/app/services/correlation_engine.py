@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from sqlalchemy.orm import Session
 from app.models.incident import Incident
 import uuid
@@ -8,12 +8,19 @@ def correlate_alert(db: Session, alert):
     existing = db.query(Incident).filter(
         Incident.source_ip == alert["ip"],
         Incident.status != "CLOSED",
-        Incident.created_at >= datetime.utcnow() - timedelta(minutes=5)
+        Incident.created_at >= datetime.now(timezone.utc) - timedelta(minutes=5)
     ).first()
 
     if existing:
-        # ✅ FIX: removed alert_count usage (not in model)
-        existing.updated_at = datetime.utcnow()
+        # ✅ NEW: increment alert count
+        if existing.alert_count is None:
+            existing.alert_count = 1
+        else:
+            existing.alert_count += 1
+
+        # ✅ update timestamp
+        existing.updated_at = datetime.now(timezone.utc)
+
         db.commit()
         return existing
 
@@ -22,7 +29,8 @@ def correlate_alert(db: Session, alert):
         source_ip=alert["ip"],
         severity=alert["severity"],
         status="OPEN",
-        created_at=datetime.utcnow()
+        created_at=datetime.now(timezone.utc),
+        alert_count=1  # ✅ NEW
     )
 
     db.add(new_incident)

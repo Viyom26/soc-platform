@@ -35,14 +35,6 @@ def get_rules(
         }
         for r in rules
     ]
-    
-    log_action(
-    db,
-    "RULE_UPDATED",
-    user["sub"],
-    details=f"Rule {rule_id} updated",
-    page="rules"
-)
 
 
 # ======================================
@@ -67,5 +59,14 @@ def update_rule(
         rule.enabled = payload["enabled"]
 
     db.commit()
+
+    # ✅ FIXED: moved log_action here (it was unreachable before)
+    log_action(
+        db,
+        "RULE_UPDATED",
+        user["sub"],
+        details=f"Rule {rule_id} updated",
+        page="rules"
+    )
 
     return {"message": "Rule updated"}

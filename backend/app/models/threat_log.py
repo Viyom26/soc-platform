@@ -24,7 +24,10 @@ class ThreatLog(Base):
 
     status = Column(String)
 
-    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+    created_at = Column(DateTime, nullable=True, index=True)  # ✅ UPDATED
+
+    # ✅ NEW (DO NOT REMOVE ANYTHING ABOVE)
+    ingested_at = Column(DateTime, default=datetime.utcnow)
 
     source_port = Column(String, nullable=True)
 

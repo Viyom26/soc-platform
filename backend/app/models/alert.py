@@ -1,4 +1,5 @@
-from sqlalchemy import Column, String, DateTime, Integer
+from sqlalchemy import Column, String, DateTime, Integer, ForeignKey
+from sqlalchemy.orm import relationship
 from datetime import datetime
 import uuid
 
@@ -26,3 +27,9 @@ class Alert(Base):
     status = Column(String, default="Open")
 
     created_at = Column(DateTime, default=datetime.utcnow, index=True)
+
+    # ✅ NEW: link to incident
+    incident_id = Column(String, ForeignKey("incidents.id"))
+
+    # ✅ NEW: relationship
+    incident = relationship("Incident", back_populates="alerts")

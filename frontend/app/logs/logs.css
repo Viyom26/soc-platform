@@ -542,6 +542,8 @@ body.dark .log-parser {
 
 body.dark .log-parser-card {
   background: rgba(17,24,39,0.65);
+  background: rgba(17, 24, 39, 0.85); /* fallback */
+  -webkit-backdrop-filter: blur(16px); /* Safari support */
   backdrop-filter: blur(16px);
   border: 1px solid rgba(255,255,255,0.05);
   box-shadow: 0 15px 40px rgba(0,0,0,0.6);
@@ -633,6 +635,8 @@ body.dark .file-name {
   border: 1px solid rgba(56, 189, 248, 0.2);
   border-radius: 10px;
   padding: 15px;
+  background: rgba(30, 41, 59, 0.8);
+  -webkit-backdrop-filter: blur(8px);
   backdrop-filter: blur(8px);
   margin-bottom: 12px;
   transition: 0.2s ease;
@@ -666,4 +670,37 @@ html.dark .log-textarea {
 html.light .log-textarea {
   background: #ffffff;
   color: #111827;
+}
+
+.search-bar {
+  margin: 20px 0;
+}
+
+.pagination {
+  margin-top: 10px;
+}
+
+.page-text {
+  margin: 0 10px;
+  display: inline;
+}
+
+.progress-box {
+  background: #0f172a;
+  padding: 10px;
+  border: 1px solid #334155;
+  margin-bottom: 15px;
+  border-radius: 8px;
+  color: #38bdf8;
+}
+
+.page-text {
+  margin: 0 10px;
+  display: inline;
+}
+
+.search-bar input {
+  padding: 8px;
+  width: 250px;
+  margin-right: 10px;
 }

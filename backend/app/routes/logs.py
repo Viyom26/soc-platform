@@ -27,6 +27,7 @@ from app.services.response_engine import automated_response
 from app.services.audit_service import log_action
 from app.services.correlation_engine import correlate_alert
 from app.services.automation_engine import auto_response
+from app.models import alert
 
 router = APIRouter(prefix="/logs", tags=["Logs"])
 
@@ -41,6 +42,41 @@ MITRE_MAP = {
     "unregistered service": ("Persistence", "T1543"),
 }
 
+progress_store = {}
+
+def parse_timestamp(row):
+    """
+    Extract timestamp from Excel/CSV/log row
+    """
+
+    for val in row:
+        if not val:
+            continue
+
+        # ✅ Excel datetime object
+        if isinstance(val, datetime):
+            return val
+
+        val_str = str(val).strip()
+
+        # ✅ ISO format (2026-03-21T14:40:00)
+        try:
+            return datetime.fromisoformat(val_str)
+        except:
+            pass
+
+        # ✅ Common formats (Excel / logs)
+        for fmt in [
+            "%d/%m/%Y %I:%M:%S %p",   # 21/03/2026 02:41:46 PM
+            "%d-%m-%Y %H:%M:%S",      # 21-03-2026 14:41:46
+            "%Y-%m-%d %H:%M:%S",      # 2026-03-21 14:41:46
+        ]:
+            try:
+                return datetime.strptime(val_str, fmt)
+            except:
+                continue
+
+    return None
 
 @router.get("")
 def get_logs(
@@ -123,6 +159,8 @@ def process_logs(file_path, filename, username):
     try:
 
         rows_cache = []
+        total_rows = 0
+        processed = 0
 
         if filename.endswith(".xlsx"):
             workbook = load_workbook(data_only=True, read_only=True, filename=file_path)
@@ -159,13 +197,20 @@ def process_logs(file_path, filename, username):
         else:
             print("Unsupported file format")
             return
+        
+        total_rows = len(rows_cache)
+
+        progress_store[username] = {
+            "total": total_rows,
+            "processed": 0
+        }
 
         def parse_row(row):
 
             try:
 
                 row_text = " ".join([str(x) for x in row if x])
-                event_time = datetime.now(timezone.utc)
+                event_time = parse_timestamp(row) or datetime.now(timezone.utc)
 
                 ip_matches = re.findall(r"\b\d{1,3}(?:\.\d{1,3}){3}\b", row_text)
 
@@ -293,6 +338,29 @@ def process_logs(file_path, filename, username):
 
         for row in rows_cache:
             parse_row(row)
+            processed += 1
+            
+            progress_store[username]["processed"] = processed
+            
+            # 🔥 SEND LIVE PROGRESS EVERY 50 LOGS
+            if processed % 50 == 0:
+                try:
+                    asyncio.run(manager.broadcast({
+                        "type": "PROGRESS_UPDATE",
+                        "processed": processed,
+                        "total": total_rows
+                    }))
+                except:
+                    pass
+            
+            try:
+                asyncio.run(manager.broadcast({
+                    "type": "PROGRESS_UPDATE",
+                    "processed": processed,
+                    "total": total_rows
+                }))
+            except:
+                pass
 
         if logs_to_add:
             db.bulk_save_objects(logs_to_add)
@@ -308,17 +376,30 @@ def process_logs(file_path, filename, username):
         
 
         db.commit()
+        
+        progress_store[username] = {
+            "processed": progress_store[username]["total"],
+            "total": progress_store[username]["total"]
+        }
 
-                # ✅ FIXED (SAFE ASYNC EXECUTION)
+        # ✅ FIXED (SAFE ASYNC EXECUTION)
         async def safe_broadcast():
             for alert in alerts_to_stream[:100]:
                 try:
+                    # ✅ SEND ALERT
                     await manager.broadcast({
-                        "type": "NEW_ALERT",  # ✅ IMPORTANT (frontend expects this)
+                        "type": "NEW_ALERT",
                         "severity": alert["severity"],
                         "source_ip": alert["source_ip"],
                         "message": alert["message"],
-                        "risk_score": alert["risk_score"]
+                        "risk_score": alert["risk_score"],
+                    })
+
+                    # ✅ SEND PROGRESS SEPARATELY
+                    await manager.broadcast({
+                        "type": "PROGRESS_UPDATE",
+                        "processed": progress_store[username]["processed"],
+                        "total": progress_store[username]["total"]
                     })
                 except Exception as e:
                     print("Broadcast failed:", e)
@@ -362,3 +443,31 @@ def search_logs(
     )
 
     return logs
+
+@router.get("/progress")
+def get_progress(
+    user=Depends(require_role("ADMIN", "ANALYST", "VIEWER"))
+):
+    username = user["sub"]
+
+    progress = progress_store.get(username)
+
+    # ✅ FIX: ensure always valid response
+    if not progress:
+        return {
+            "processed": 0,
+            "total": 0,
+            "percentage": 0
+        }
+
+    processed = progress.get("processed", 0)
+    total = progress.get("total", 0)
+
+    # ✅ EXTRA: send percentage (helps frontend)
+    percentage = (processed / total * 100) if total > 0 else 0
+
+    return {
+        "processed": processed,
+        "total": total,
+        "percentage": round(percentage, 2)
+    }

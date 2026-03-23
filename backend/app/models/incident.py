@@ -1,4 +1,5 @@
-from sqlalchemy import Column, String, DateTime
+from sqlalchemy import Column, String, DateTime, Integer
+from sqlalchemy.orm import relationship
 from datetime import datetime, timezone
 from app.database import Base
 
@@ -34,3 +35,9 @@ class Incident(Base):
     
     # ✅ REQUIRED (you already added correctly)
     closed_at = Column(DateTime, nullable=True)
+
+    # ✅ NEW: alert counter (FIXES YOUR ERROR)
+    alert_count = Column(Integer, default=1)
+
+    # ✅ NEW: relationship with alerts
+    alerts = relationship("Alert", back_populates="incident")

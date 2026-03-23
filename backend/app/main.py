@@ -5,17 +5,17 @@ from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel, EmailStr
-
+from app.utils.security import get_password_hash
 from sqlalchemy.orm import Session
 from sqlalchemy import desc, func, text
-
+from app.models import User
 from app.database import Base, engine, get_db
 from app.models import *
 from app.models.user import User
 from app.models.incident import Incident
 from app.models.audit_log import AuditLog
 from app.models.threat_log import ThreatLog
-
+from app.database import SessionLocal
 from app.routes import ip_intelligence
 from app.routes import detection_rules
 from app.routes import rules
@@ -50,10 +50,24 @@ from app.api.ai_prediction import router as ai_prediction_router
 from app.services.audit_service import log_action
 from app.routes import actions
 from app.routes import assets
+from app.models.user import User
+from app.services.rule_loader import load_default_rules
+app = FastAPI(title="SOC Backend", version="2.2")
+@app.on_event("startup")
+def startup_event():
+    try:
+        create_default_admin()
 
+        # ✅ ADD THIS (IMPORTANT)
+        db = SessionLocal()
+        load_default_rules(db)
+        db.close()
+
+    except Exception as e:
+        print("⚠️ Startup skipped:", e)
 # ================= INIT =================
 
-from sqlalchemy.exc import OperationalError, SQLAlchemyError  # ✅ UPDATED
+from sqlalchemy.exc import OperationalError, SQLAlchemyError, IntegrityError  # ✅ UPDATED
 
 try:
     Base.metadata.create_all(bind=engine)
@@ -66,26 +80,43 @@ app = FastAPI(title="SOC Backend", version="2.2")
 
 @app.on_event("startup")
 def startup_event():
-    create_default_admin()
+    try:
+        create_default_admin()
+    except Exception as e:
+        print("⚠️ Startup skipped:", e)
 
 # ================= DEFAULT ADMIN =================
 
 def create_default_admin():
-    db = next(get_db())
+    db = SessionLocal()
+
     try:
-        if not db.query(User).first():
-            admin = User(
-                id=str(uuid.uuid4()),
-                email="admin@example.com",
-                hashed_password=get_password_hash("admin123"),
-                full_name="Default Admin",
-                organization="AttackSurface",
-                role="ADMIN",
-                is_active=True,
-            )
-            db.add(admin)
-            db.commit()
-            print("✅ Default admin created")
+        existing_admin = db.query(User).filter(User.email == "admin@example.com").first()
+
+        if existing_admin:
+            print("✅ Admin already exists, skipping...")
+            return
+
+        admin = User(
+        id=str(uuid.uuid4()),  # ✅ FIX
+        email="admin@example.com",
+        hashed_password=get_password_hash("admin123"),
+        full_name="Default Admin",
+        organization="AttackSurface",
+        role="ADMIN",
+        is_active=True,
+        created_at=datetime.utcnow(),
+        updated_at=datetime.utcnow(),
+        )
+
+        db.add(admin)
+        db.commit()
+        print("✅ Default admin created")
+
+    except IntegrityError:
+        db.rollback()
+        print("⚠️ Admin creation skipped (duplicate or race condition)")
+
     finally:
         db.close()
 

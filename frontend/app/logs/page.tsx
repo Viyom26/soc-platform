@@ -33,6 +33,9 @@ export default function LogsPage() {
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [progress, setProgress] = useState(0);
+  const [totalLogs, setTotalLogs] = useState(0);
+  
 
   const safe = (val: unknown) =>
     val === null || val === undefined || val === "" ? "N/A" : String(val);
@@ -96,8 +99,29 @@ export default function LogsPage() {
   /* ================= INITIAL LOAD ================= */
 
   useEffect(() => {
-    fetchLogs();
-  }, []);
+  const interval = setInterval(async () => {
+    try {
+      const res = await apiFetch("/logs/progress");
+
+      if (!res) return;
+
+      setProgress(res.processed || 0);
+      setTotalLogs(res.total || 0);
+
+      // ✅ AUTO LOAD LOGS WHEN DONE
+      if (res.total > 0 && res.processed === res.total) {
+        await fetchLogs();
+        clearInterval(interval);
+      }
+
+    } catch (err) {
+      console.error("Progress polling error:", err);
+    }
+  }, 1000);
+
+  return () => clearInterval(interval);
+}, []);
+
 
   /* ================= PARSE LOGS ================= */
 
@@ -134,6 +158,9 @@ export default function LogsPage() {
       });
 
       setError("Logs uploaded. Processing may take a few seconds...");
+      // ✅ RESET PROGRESS UI
+      setProgress(0);
+      setTotalLogs(1); // force bar visible immediately
 
       let attempts = 0;
 
@@ -228,13 +255,40 @@ export default function LogsPage() {
           {loading ? "Parsing logs..." : "Convert Logs"}
         </button>
 
+        {(
+          
+  <div style={{ marginTop: "15px" }}>
+    <div
+      style={{
+        height: "10px",
+        background: "#1e293b",
+        borderRadius: "6px",
+        overflow: "hidden",
+      }}
+    >
+      <div
+        style={{
+          width: `${totalLogs > 0 ? (progress / totalLogs) * 100 : 0}%`,
+          background: "#22c55e",
+          height: "100%",
+          transition: "0.3s",
+        }}
+      />
+    </div>
+
+    <p style={{ marginTop: "5px", fontSize: "12px" }}>
+      Processing {progress} / {totalLogs || "Calculating..."} logs
+    </p>
+  </div>
+)}
+
         {error && <p className="error-text">{error}</p>}
 
       </Card>
 
       {/* 🔥 SEARCH BAR ADDED HERE */}
 
-      <div style={{ margin: "20px 0" }}>
+      <div className="search-bar">
         <input
           type="text"
           placeholder="Search by IP or message..."
@@ -323,29 +377,29 @@ export default function LogsPage() {
 
       {/* 🔥 PAGINATION ADDED */}
 
-      <div style={{ marginTop: "10px" }}>
-        <button
-          onClick={() => {
-            const newPage = Math.max(1, page - 1);
-            setPage(newPage);
-            setTimeout(searchLogs, 0);
-          }}
-        >
-          Prev
-        </button>
+      <div className="pagination">
+  <button
+    onClick={() => {
+      const newPage = Math.max(1, page - 1);
+      setPage(newPage);
+      setTimeout(searchLogs, 0);
+    }}
+  >
+    Prev
+  </button>
 
-        <span style={{ margin: "0 10px" }}>Page {page}</span>
+  <span className="page-text">Page {page}</span>
 
-        <button
-          onClick={() => {
-            const newPage = page + 1;
-            setPage(newPage);
-            setTimeout(searchLogs, 0);
-          }}
-        >
-          Next
-        </button>
-      </div>
+  <button
+    onClick={() => {
+      const newPage = page + 1;
+      setPage(newPage);
+      setTimeout(searchLogs, 0);
+    }}
+  >
+    Next
+  </button>
+</div>
 
       <HistoryPanel pageFilter="logs" />
 
