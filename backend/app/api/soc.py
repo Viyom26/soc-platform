@@ -3,8 +3,10 @@ from sqlalchemy.orm import Session
 from sqlalchemy import or_
 
 from app.database import get_db
-from app.models.log import Log # pyright: ignore[reportMissingImports]
+from app.models.log import Log  # pyright: ignore[reportMissingImports]
 from app.services.score import calculate_ip_score
+
+from datetime import datetime  # ✅ NEW
 
 router = APIRouter(prefix="/api/soc", tags=["SOC"])
 
@@ -27,13 +29,12 @@ def ip_analysis(ip: str, db: Session = Depends(get_db)):
     hourly = {}
 
     for log in logs:
-        # Destination count
-        destinations[log.destination_ip] = (
-            destinations.get(log.destination_ip, 0) + 1
-        )
+        # ✅ SAFE destination handling
+        dest_ip = log.destination_ip or "UNKNOWN"
+        destinations[dest_ip] = destinations.get(dest_ip, 0) + 1
 
-        # Auto port detect from protocol
-        port = log.destination_port
+        # ✅ SAFE port detection
+        port = log.destination_port or 0
         if log.protocol == "HTTP":
             port = 80
         elif log.protocol == "HTTPS":
@@ -41,17 +42,19 @@ def ip_analysis(ip: str, db: Session = Depends(get_db)):
 
         ports.add(port)
 
-        # Severity breakdown
-        severities[log.severity] = (
-            severities.get(log.severity, 0) + 1
-        )
+        # ✅ SAFE severity
+        severity = log.severity or "UNKNOWN"
+        severities[severity] = severities.get(severity, 0) + 1
+
+        # ✅ SAFE timestamp
+        ts = log.timestamp or datetime.utcnow()
 
         # Date-wise
-        date_key = log.timestamp.strftime("%Y-%m-%d")
+        date_key = ts.strftime("%Y-%m-%d")
         date_wise[date_key] = date_wise.get(date_key, 0) + 1
 
         # Hourly
-        hour_key = log.timestamp.strftime("%Y-%m-%d %H:00")
+        hour_key = ts.strftime("%Y-%m-%d %H:00")
         hourly[hour_key] = hourly.get(hour_key, 0) + 1
 
     # Suspicious threshold
@@ -65,6 +68,12 @@ def ip_analysis(ip: str, db: Session = Depends(get_db)):
     activity_score = total_count * 0.3 + len(destinations) * 2 + len(ports) * 3
     threat_score = round(base_score + activity_score, 2)
 
+    # ✅ SAFE first/last seen
+    timestamps = [log.timestamp for log in logs if log.timestamp]
+
+    first_seen = min(timestamps) if timestamps else None
+    last_seen = max(timestamps) if timestamps else None
+
     return {
         "ip": ip,
         "total_events": total_count,
@@ -74,8 +83,8 @@ def ip_analysis(ip: str, db: Session = Depends(get_db)):
         "severity_breakdown": severities,
         "date_wise_activity": date_wise,
         "hourly_activity": hourly,
-        "first_seen": min(log.timestamp for log in logs),
-        "last_seen": max(log.timestamp for log in logs),
+        "first_seen": first_seen,
+        "last_seen": last_seen,
         "suspicious": suspicious,
         "port_scan_detected": port_scan_detected,
         "threat_score": threat_score

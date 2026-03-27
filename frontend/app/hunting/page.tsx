@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { apiFetch } from '@/lib/api';
 
 import {
@@ -19,11 +19,22 @@ import {
 } from 'recharts';
 
 type LogItem = {
-  id?: string;
-  source_ip?: string;
-  destination_ip?: string;
-  destination_port?: string;
+  id: number;
+  source_ip: string;
+  destination_ip: string;
+  destination_port: string;
+  severity: string;
+  created_at: string;
+  protocol: string;
+};
+
+type ApiLogItem = {
+  src_ip?: string;
+  dst_ip?: string;
+  dst_port?: string;
   severity?: string;
+  protocol?: string;
+  time?: string;
   created_at?: string;
 };
 
@@ -38,11 +49,78 @@ export default function HuntingPage() {
   const [data, setData] = useState<HuntingResponse | null>(null);
 
   const search = async () => {
-    if (!ip) return;
+    try {
+      console.log('Searching for:', ip);
 
-    const res = await apiFetch(`/api/threat-hunting?ip=${ip}`);
-    setData(res);
+      let res: { items: ApiLogItem[] };
+
+      if (ip) {
+        res = await apiFetch(`/logs/hunt?ip=${ip}`);
+      } else {
+        res = await apiFetch(`/logs`);
+      }
+
+      console.log('API RESPONSE:', res);
+
+      setData({
+        total_logs: res.items?.length || 0,
+        max_severity:
+          res.items && res.items.length > 0
+            ? res.items[0].severity || 'N/A'
+            : 'N/A',
+
+        logs: (res.items || []).map((item: ApiLogItem, index: number) => ({
+          id: index,
+          source_ip: item.src_ip || 'N/A',
+          destination_ip: item.dst_ip || 'N/A',
+          destination_port: item.dst_port || 'Unknown',
+          protocol: item.protocol || 'UNKNOWN',
+          severity: item.severity || 'LOW',
+          created_at: item.time || item.created_at || '',
+        })),
+      });
+    } catch (err) {
+      console.error('SEARCH ERROR:', err);
+    }
   };
+
+  // 🔄 AUTO REFRESH EVERY 5 SECONDS
+  useEffect(() => {
+    const interval = setInterval(() => {
+      console.log('🔄 Live refresh...');
+
+      if (ip) {
+        apiFetch(`/logs/hunt?ip=${ip}`).then((res: { items: ApiLogItem[] }) => {
+          setData({
+            total_logs: res.items?.length || 0,
+            max_severity:
+              res.items && res.items.length > 0
+                ? res.items[0].severity || 'N/A'
+                : 'N/A',
+            logs: (res.items || []).map((item: ApiLogItem, index: number) => ({
+              id: index,
+              source_ip: item.src_ip || 'N/A',
+              destination_ip: item.dst_ip || 'N/A',
+              destination_port: item.dst_port || 'Unknown',
+              protocol: item.protocol || 'UNKNOWN',
+              severity: item.severity || 'LOW',
+              created_at: item.time || item.created_at || '',
+            })),
+          });
+        });
+      }
+    }, 5000);
+
+    return () => clearInterval(interval);
+
+    // 👇 IMPORTANT
+  }, [ip]);
+
+  // 🔥 AUTO LOAD ON PAGE OPEN
+  useEffect(() => {
+    search();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // ================= CHART DATA =================
 
@@ -51,7 +129,7 @@ export default function HuntingPage() {
       time: log.created_at
         ? new Date(log.created_at).toLocaleTimeString()
         : 'N/A',
-      value: 1,
+      value: log.severity === 'HIGH' ? 10 : log.severity === 'MEDIUM' ? 5 : 1,
     })) || [];
 
   const severityCount: Record<string, number> = {};
@@ -120,12 +198,20 @@ export default function HuntingPage() {
     spike: x.count > avg * 2 ? x.count : 0, // spike threshold
   }));
 
+  const COLORS = ['#ef4444', '#f59e0b', '#3b82f6', '#10b981'];
+
   // ================= UI =================
+
+  // ⚡ ATTACK FLOW DATA (FIXED)
+  const attackFlowData =
+    data?.logs?.slice(0, 20).map((log) => ({
+      name: `${log.source_ip} → ${log.destination_ip}`,
+      value: 1,
+    })) || [];
 
   return (
     <div className="p-6 text-white">
       <h1 className="text-2xl mb-4">Threat Hunting</h1>
-
       {/* INPUT */}
       <input
         value={ip}
@@ -133,137 +219,188 @@ export default function HuntingPage() {
         placeholder="Enter IP"
         className="p-2 text-black mr-2"
       />
-
       <button onClick={search} className="bg-blue-600 px-3 py-2">
         Search
       </button>
 
-      {/* ================= RESULTS ================= */}
+      <button
+        onClick={() => {
+          setIp('');
+          search();
+        }}
+        className="bg-green-600 px-3 py-2 ml-2"
+      >
+        Show All
+      </button>
 
       {data && (
-        <div className="mt-6">
-          {/* SUMMARY */}
-          <div className="mb-6">
-            <h2>Total Logs: {data.total_logs}</h2>
-            <h2>Max Severity: {data.max_severity}</h2>
-          </div>
+        <pre className="text-xs mt-4 bg-black p-2">
+          {JSON.stringify(data, null, 2)}
+        </pre>
+      )}
+      {/* ================= RESULTS ================= */}
+      {data ? (
+        data.logs && data.logs.length > 0 ? (
+          <div className="mt-6">
+            {/* SUMMARY */}
+            <div className="mb-6">
+              <h2>Total Logs: {data.total_logs}</h2>
+              <h2>Max Severity: {data.max_severity}</h2>
+            </div>
 
-          {/* ================= CHARTS ================= */}
+            {/* ================= CHARTS ================= */}
 
-          <div className="grid grid-cols-2 gap-6">
-            {/* 📈 TIMELINE */}
-            <div className="bg-gray-900 p-4 rounded">
-              <h3 className="mb-2">Attack Timeline</h3>
+            <div className="grid grid-cols-2 gap-6">
+              {/* 📈 TIMELINE */}
+              <div className="bg-gray-900 p-4 rounded">
+                <h3 className="mb-2">Attack Timeline</h3>
 
-              <LineChart width={400} height={250} data={timelineData}>
+                <LineChart width={500} height={250} data={timelineData}>
+                  <CartesianGrid stroke="#334155" />
+                  <XAxis dataKey="time" stroke="#94a3b8" />
+                  <YAxis stroke="#94a3b8" />
+                  <Tooltip />
+                  <Line
+                    type="monotone"
+                    dataKey="value"
+                    stroke="#3b82f6"
+                    strokeWidth={2}
+                  />
+                </LineChart>
+              </div>
+
+              {/* 🧁 SEVERITY PIE */}
+              <div className="bg-gray-900 p-4 rounded">
+                <h3 className="mb-2">Severity Distribution</h3>
+
+                <PieChart width={400} height={250}>
+                  <Pie
+                    data={pieData}
+                    dataKey="value"
+                    nameKey="name"
+                    outerRadius={80}
+                    label
+                  >
+                    {pieData.map((_, index) => (
+                      <Cell key={index} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                  <Legend />
+                </PieChart>
+              </div>
+            </div>
+
+            {/* ================= EXTRA CHARTS ================= */}
+
+            <div className="grid grid-cols-2 gap-6 mt-6">
+              {/* 🎯 TOP PORTS */}
+              <div className="bg-gray-900 p-4 rounded">
+                <h3 className="mb-2">Top Target Ports</h3>
+
+                <BarChart width={400} height={250} data={portData}>
+                  <CartesianGrid stroke="#334155" />
+                  <XAxis dataKey="port" stroke="#94a3b8" />
+                  <YAxis stroke="#94a3b8" />
+                  <Tooltip />
+                  <Bar dataKey="count" fill="#3b82f6" />
+                </BarChart>
+              </div>
+
+              {/* 🚨 TOP ATTACKERS */}
+              <div className="bg-gray-900 p-4 rounded">
+                <h3 className="mb-2">Top Attackers</h3>
+
+                <BarChart width={400} height={250} data={attackerData}>
+                  <CartesianGrid stroke="#334155" />
+                  <XAxis dataKey="ip" stroke="#94a3b8" />
+                  <YAxis stroke="#94a3b8" />
+                  <Tooltip />
+                  <Bar dataKey="count" fill="#ef4444" />
+                </BarChart>
+              </div>
+            </div>
+
+            {/* 🚨 ANOMALY DETECTION CHART */}
+
+            <div className="bg-gray-900 p-4 rounded mt-6">
+              <h3 className="mb-2 text-red-400">
+                Anomaly Detection (Spike Analysis)
+              </h3>
+
+              <LineChart width={900} height={300} data={anomalyChartData}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="time" />
                 <YAxis />
                 <Tooltip />
-                <Line type="monotone" dataKey="value" />
+
+                {/* Normal traffic */}
+                <Line
+                  type="monotone"
+                  dataKey="count"
+                  stroke="#3b82f6"
+                  strokeWidth={2}
+                />
+
+                {/* Spike highlight */}
+                <Line
+                  type="monotone"
+                  dataKey="spike"
+                  stroke="#ef4444"
+                  strokeWidth={2}
+                />
               </LineChart>
             </div>
 
-            {/* 🧁 SEVERITY PIE */}
-            <div className="bg-gray-900 p-4 rounded">
-              <h3 className="mb-2">Severity Distribution</h3>
+            {/* ⚡ ATTACK FLOW */}
+            <div className="bg-gray-900 p-4 rounded mt-6">
+              <h3 className="mb-2 text-yellow-400">Attack Flow</h3>
 
-              <PieChart width={400} height={250}>
-                <Pie
-                  data={pieData}
-                  dataKey="value"
-                  nameKey="name"
-                  outerRadius={80}
-                  label
-                >
-                  {pieData.map((_, index) => (
-                    <Cell key={index} />
-                  ))}
-                </Pie>
+              <BarChart width={900} height={300} data={attackFlowData}>
+                <CartesianGrid stroke="#334155" />
+                <XAxis dataKey="name" hide stroke="#94a3b8" />
+                <YAxis stroke="#94a3b8" />
                 <Tooltip />
-                <Legend />
-              </PieChart>
-            </div>
-          </div>
-
-          {/* ================= EXTRA CHARTS ================= */}
-
-          <div className="grid grid-cols-2 gap-6 mt-6">
-            {/* 🎯 TOP PORTS */}
-            <div className="bg-gray-900 p-4 rounded">
-              <h3 className="mb-2">Top Target Ports</h3>
-
-              <BarChart width={400} height={250} data={portData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="port" />
-                <YAxis />
-                <Tooltip />
-                <Bar dataKey="count" />
+                <Bar dataKey="value" fill="#f59e0b" />
               </BarChart>
             </div>
 
-            {/* 🚨 TOP ATTACKERS */}
-            <div className="bg-gray-900 p-4 rounded">
-              <h3 className="mb-2">Top Attackers</h3>
+            {/* ================= LOG TABLE ================= */}
 
-              <BarChart width={400} height={250} data={attackerData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="ip" />
-                <YAxis />
-                <Tooltip />
-                <Bar dataKey="count" />
-              </BarChart>
-            </div>
-          </div>
-
-          {/* 🚨 ANOMALY DETECTION CHART */}
-
-          <div className="bg-gray-900 p-4 rounded mt-6">
-            <h3 className="mb-2 text-red-400">
-              Anomaly Detection (Spike Analysis)
-            </h3>
-
-            <LineChart width={800} height={300} data={anomalyChartData}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="time" />
-              <YAxis />
-              <Tooltip />
-
-              {/* Normal traffic */}
-              <Line type="monotone" dataKey="count" />
-
-              {/* Spike highlight */}
-              <Line type="monotone" dataKey="spike" stroke="red" />
-            </LineChart>
-          </div>
-
-          {/* ================= LOG TABLE ================= */}
-
-          <div className="mt-6 overflow-auto max-h-[400px]">
-            <table className="w-full border">
-              <thead>
-                <tr>
-                  <th>Source</th>
-                  <th>Destination</th>
-                  <th>Severity</th>
-                  <th>Time</th>
-                </tr>
-              </thead>
-
-              <tbody>
-                {data.logs?.map((log: LogItem) => (
-                  <tr key={log.id}>
-                    <td>{log.source_ip}</td>
-                    <td>{log.destination_ip}</td>
-                    <td>{log.severity}</td>
-                    <td>{log.created_at}</td>
+            <div className="mt-6 overflow-auto max-h-[400px]">
+              <table className="w-full border">
+                <thead>
+                  <tr>
+                    <th>Source</th>
+                    <th>Destination</th>
+                    <th>Severity</th>
+                    <th>Time</th>
+                    <th>Protocol</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+
+                <tbody>
+                  {data.logs?.map((log: LogItem) => (
+                    <tr key={log.id}>
+                      <td>{log.source_ip}</td>
+                      <td>{log.destination_ip}</td>
+                      <td>{log.severity}</td>
+                      <td>
+                        {log.created_at
+                          ? new Date(log.created_at).toLocaleString()
+                          : 'N/A'}
+                      </td>
+                      <td>{log.protocol || 'N/A'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
-      )}
+        ) : (
+          <div className="mt-6 text-red-400">❌ No logs found for this IP</div>
+        )
+      ) : null}
     </div>
   );
 }

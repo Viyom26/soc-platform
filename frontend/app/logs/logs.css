@@ -13,9 +13,8 @@ html.light .logs-page {
 
 /* DARK MODE */
 html.dark .logs-page {
-  background: linear-gradient(135deg,#020617,#020617,#020617);
+  background: linear-gradient(135deg, #020617, #020617, #020617);
 }
-
 
 .page-title {
   font-size: 26px;
@@ -62,7 +61,6 @@ html.dark .logs-page {
   margin-top: 8px;
   font-weight: 500;
 }
-
 
 /* ================= TABLE WRAPPER ================= */
 
@@ -142,7 +140,7 @@ html.dark .logs-page {
   padding: 18px;
   border-radius: 12px;
   margin-top: 24px;
-  box-shadow: 0 4px 14px rgba(0,0,0,0.05);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.05);
 }
 
 .history-container h3 {
@@ -211,7 +209,7 @@ html.dark .logs-page {
   border-radius: 6px;
   border: 1px solid #d1d5db;
   background: #1e293b;
-border: 1px solid #334155;
+  border: 1px solid #334155;
   cursor: pointer;
 }
 
@@ -237,8 +235,6 @@ border: 1px solid #334155;
 .log-textarea::placeholder {
   color: #475569;
 }
-
-
 
 /* File input */
 .file-row input {
@@ -271,7 +267,7 @@ border: 1px solid #334155;
   padding: 16px;
   border-radius: 10px;
   margin-top: 20px;
-  max-height: none;     /* remove height restriction */
+  max-height: none; /* remove height restriction */
   overflow: visible;
 }
 
@@ -282,7 +278,6 @@ border: 1px solid #334155;
   border-radius: 8px;
   margin-bottom: 10px;
 }
-
 
 .timeline-content strong {
   color: #111827;
@@ -301,7 +296,6 @@ border: 1px solid #334155;
   font-weight: 600;
 }
 
-
 .timeline-item {
   background: #ffffff;
   border: 1px solid #cbd5e1;
@@ -315,9 +309,10 @@ border: 1px solid #334155;
   font-weight: 500;
 }
 
-html, body {
+html,
+body {
   height: auto;
-  overflow-y: auto!important;
+  overflow-y: auto !important;
 }
 
 .logs-table-wrapper {
@@ -328,7 +323,7 @@ html, body {
 .logs-card h3,
 .logs-card h2,
 .logs-card h4 {
-  color: #111827 !important;  /* Dark black */
+  color: #111827 !important; /* Dark black */
   font-weight: 700;
 }
 
@@ -354,7 +349,7 @@ html, body {
   padding: 20px;
   border-radius: 12px;
   margin-top: 20px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
 }
 
 .history-title {
@@ -436,7 +431,7 @@ html, body {
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(15, 23, 42, 0.75);  /* dark blur background */
+  background: rgba(15, 23, 42, 0.75); /* dark blur background */
   display: flex;
   align-items: center;
   justify-content: center;
@@ -459,14 +454,14 @@ html, body {
   margin-bottom: 16px;
   font-size: 20px;
   font-weight: 700;
-  color: #0f172a;   /* DARK TEXT */
+  color: #0f172a; /* DARK TEXT */
 }
 
 /* ===== MODAL TEXT ===== */
 .modal-content p {
   font-size: 14px;
   margin-bottom: 8px;
-  color: #111827;   /* DARKER TEXT */
+  color: #111827; /* DARKER TEXT */
 }
 
 /* Labels */
@@ -493,10 +488,15 @@ html, body {
 
 /* ===== ANIMATION ===== */
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
-
 
 .close-btn {
   margin-top: 15px;
@@ -532,8 +532,8 @@ body.dark .log-parser textarea {
 }
 
 body.dark .log-parser {
-  background: rgba(15,23,42,0.85);
-  border: 1px solid rgba(59,130,246,0.2);
+  background: rgba(15, 23, 42, 0.85);
+  border: 1px solid rgba(59, 130, 246, 0.2);
 }
 
 /* =========================================
@@ -541,12 +541,12 @@ body.dark .log-parser {
 ========================================= */
 
 body.dark .log-parser-card {
-  background: rgba(17,24,39,0.65);
+  background: rgba(17, 24, 39, 0.65);
   background: rgba(17, 24, 39, 0.85); /* fallback */
   -webkit-backdrop-filter: blur(16px); /* Safari support */
   backdrop-filter: blur(16px);
-  border: 1px solid rgba(255,255,255,0.05);
-  box-shadow: 0 15px 40px rgba(0,0,0,0.6);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  box-shadow: 0 15px 40px rgba(0, 0, 0, 0.6);
   border-radius: 16px;
 }
 
@@ -616,19 +616,34 @@ body.dark .file-name {
 }
 
 @keyframes criticalPulse {
-  0% { box-shadow: 0 0 5px rgba(239,68,68,0.6); }
-  50% { box-shadow: 0 0 25px rgba(239,68,68,0.9); }
-  100% { box-shadow: 0 0 5px rgba(239,68,68,0.6); }
+  0% {
+    box-shadow: 0 0 5px rgba(239, 68, 68, 0.6);
+  }
+  50% {
+    box-shadow: 0 0 25px rgba(239, 68, 68, 0.9);
+  }
+  100% {
+    box-shadow: 0 0 5px rgba(239, 68, 68, 0.6);
+  }
 }
 
 .row-critical {
   animation: criticalPulse 2s infinite;
 }
 
-.severity-critical { color: #ff3b3b; font-weight: bold; }
-.severity-high { color: #ff8800; }
-.severity-medium { color: #ffd500; }
-.severity-low { color: #00ff88; }
+.severity-critical {
+  color: #ff3b3b;
+  font-weight: bold;
+}
+.severity-high {
+  color: #ff8800;
+}
+.severity-medium {
+  color: #ffd500;
+}
+.severity-low {
+  color: #00ff88;
+}
 
 .soc-card {
   background: rgba(30, 41, 59, 0.6);
@@ -650,13 +665,13 @@ body.dark .file-name {
 /* ================= DARK MODE TIMELINE ================= */
 
 html.dark .history-container {
-  background: rgba(17,24,39,0.65);
-  border: 1px solid rgba(255,255,255,0.05);
+  background: rgba(17, 24, 39, 0.65);
+  border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 html.dark .timeline-item {
-  background: rgba(15,23,42,0.75);
-  border: 1px solid rgba(255,255,255,0.05);
+  background: rgba(15, 23, 42, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 /* ================= TEXTAREA FIX ================= */

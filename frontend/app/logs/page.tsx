@@ -69,7 +69,7 @@ export default function LogsPage() {
   const searchLogs = async () => {
     try {
       const data = await apiFetch(
-        `/logs/search?query=${searchQuery}&page=${page}`
+        `/logs/search?query=${searchQuery.trim()}&page=${page}`
       );
 
       if (Array.isArray(data)) {
@@ -88,7 +88,9 @@ export default function LogsPage() {
   /* ================= INITIAL LOAD ================= */
 
   useEffect(() => {
-    fetchLogs();
+    if (!searchQuery) {
+      fetchLogs();
+    }
 
     // ✅ CONNECT TO BACKEND WEBSOCKET
     const ws = new WebSocket('ws://localhost:8000/ws/alerts');
@@ -143,7 +145,7 @@ export default function LogsPage() {
     return () => {
       ws.close();
     };
-  }, [fetchLogs]);
+  }, [fetchLogs, searchQuery]);
 
   /* ================= PARSE LOGS ================= */
 
@@ -340,9 +342,53 @@ export default function LogsPage() {
                   const time = l.event_time || l.created_at;
 
                   return (
-                    <tr key={i}>
-                      <td>{safe(l.src_ip)}</td>
-                      <td>{safe(l.dst_ip)}</td>
+                    <tr
+                      key={i}
+                      style={{
+                        background:
+                          searchQuery &&
+                          (l.src_ip?.includes(searchQuery) ||
+                            l.dst_ip?.includes(searchQuery))
+                            ? 'rgba(59,130,246,0.15)'
+                            : 'transparent',
+
+                        boxShadow:
+                          searchQuery &&
+                          (l.src_ip?.includes(searchQuery) ||
+                            l.dst_ip?.includes(searchQuery))
+                            ? '0 0 10px #3b82f6'
+                            : 'none',
+                      }}
+                    >
+                      <td
+                        style={{
+                          color:
+                            searchQuery && l.src_ip?.includes(searchQuery)
+                              ? '#3b82f6'
+                              : 'inherit',
+                          fontWeight:
+                            searchQuery && l.src_ip?.includes(searchQuery)
+                              ? 'bold'
+                              : 'normal',
+                        }}
+                      >
+                        {safe(l.src_ip)}
+                      </td>
+
+                      <td
+                        style={{
+                          color:
+                            searchQuery && l.dst_ip?.includes(searchQuery)
+                              ? '#3b82f6'
+                              : 'inherit',
+                          fontWeight:
+                            searchQuery && l.dst_ip?.includes(searchQuery)
+                              ? 'bold'
+                              : 'normal',
+                        }}
+                      >
+                        {safe(l.dst_ip)}
+                      </td>
                       <td>{safe(l.src_port)}</td>
                       <td>{safe(l.dst_port)}</td>
                       <td>{safe(l.protocol)}</td>

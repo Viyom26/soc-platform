@@ -187,7 +187,7 @@ app.include_router(attack_stream.router)
 app.include_router(threat_intel.router, prefix="/api")
 app.include_router(live_network.router, prefix="/api")
 
-app.include_router(hunting.router)
+app.include_router(hunting.router, prefix="/logs")
 app.include_router(actions.router)
 
 # ================= AUTH =================

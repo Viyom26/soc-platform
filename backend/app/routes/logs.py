@@ -10,10 +10,10 @@ import asyncio
 from fastapi.concurrency import run_in_threadpool
 from datetime import datetime, timezone
 from typing import Optional
-
+from sqlalchemy import or_
 from fastapi import APIRouter, Form, UploadFile, File, Depends, BackgroundTasks
 from sqlalchemy.orm import Session
-
+from fastapi import Query
 from openpyxl import load_workbook
 
 from app.database import get_db, SessionLocal
@@ -540,27 +540,53 @@ def process_logs(file_path, filename, username):
 
 @router.get("/search")
 def search_logs(
-    source_ip: str = "",
-    destination_ip: str = "",
-    severity: str = "",
-    protocol: str = "",
-    page: int = 1,
-    limit: int = 50,
-    db: Session = Depends(get_db),
-    user=Depends(require_role("ADMIN", "ANALYST", "VIEWER")),
-):
+        query: str = Query(default=""),
+        source_ip: str = Query(default=""),
+        destination_ip: str = Query(default=""),
+        severity: str = Query(default=""),
+        protocol: str = Query(default=""),
+        page: int = 1,
+        limit: int = 50,
+        db: Session = Depends(get_db),
+        user=Depends(require_role("ADMIN", "ANALYST", "VIEWER")),
+    ):
+    
+    print("QUERY RECEIVED:", repr(query))
 
     offset = (page - 1) * limit
 
     q = db.query(ThreatLog).filter(
         ThreatLog.user_email == user["sub"]
     )
+    
+    # ✅ Prevent empty search
+    if not query and not source_ip and not destination_ip:
+        return {"items": []}
 
-    if source_ip:
-        q = q.filter(ThreatLog.source_ip.contains(source_ip))
+    # ✅ Main query search    
+    if query and query.strip():
+        ip = query.strip()
+        
+        print("🔍 Searching IP:", ip)
 
+        q = q.filter(
+            or_(
+                ThreatLog.source_ip.ilike(f"%{ip}%"),
+                ThreatLog.destination_ip.ilike(f"%{ip}%")
+            )
+        )
+
+    elif source_ip:
+        ip = source_ip.strip()
+        q = q.filter(
+            or_(
+                ThreatLog.source_ip == ip,
+                ThreatLog.destination_ip == ip
+            )
+        )
+    
     if destination_ip:
-        q = q.filter(ThreatLog.destination_ip.contains(destination_ip))
+        q = q.filter(ThreatLog.destination_ip == destination_ip.strip())
 
     if severity:
         q = q.filter(ThreatLog.severity == severity.upper())
@@ -569,13 +595,62 @@ def search_logs(
         q = q.filter(ThreatLog.protocol == protocol.upper())
 
     logs = (
-        q.order_by(ThreatLog.created_at.desc())
-        .offset(offset)
-        .limit(limit)
-        .all()
+    q.order_by(ThreatLog.created_at.desc())
+    .offset(offset)
+    .limit(limit)
+    .all()
     )
 
-    return logs
+    items = []
+
+    for log in logs:
+        items.append({
+            "src_ip": log.source_ip or "N/A",
+            "dst_ip": log.destination_ip or "N/A",
+            "src_port": log.source_port or "N/A",
+            "dst_port": log.destination_port or "N/A",
+            "protocol": log.protocol or "UNKNOWN",
+            "severity": log.severity or "LOW",
+            "threat": log.message or "N/A",
+            "created_at": log.created_at.isoformat() if log.created_at else None,
+            "mitre_tactic": log.mitre_tactic or "N/A",
+            "mitre_technique": log.mitre_technique or "N/A",
+        })
+
+    return {"items": items}
+
+@router.get("/hunt")
+def threat_hunt(
+    ip: str,
+    db: Session = Depends(get_db),
+    user=Depends(require_role("ADMIN", "ANALYST", "VIEWER")),
+):
+    from sqlalchemy import or_
+
+    logs = db.query(ThreatLog).filter(
+        ThreatLog.user_email == user["sub"],
+        or_(
+            ThreatLog.source_ip == ip,
+            ThreatLog.destination_ip == ip
+        )
+    ).order_by(ThreatLog.created_at.desc()).limit(200).all()
+
+    if not logs:
+        return {"items": []}
+
+    items = []
+
+    for log in logs:
+        items.append({
+            "src_ip": log.source_ip,
+            "dst_ip": log.destination_ip,
+            "protocol": log.protocol,
+            "severity": log.severity,
+            "threat": log.message,
+            "time": log.created_at.isoformat() if log.created_at else None
+        })
+
+    return {"items": items}
 
 @router.get("/progress")
 def get_progress(
