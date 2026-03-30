@@ -10,7 +10,7 @@ router = APIRouter(prefix="/api/export", tags=["Export"])
 
 
 @router.get("/incident/{id}")
-def export_incident(id: int, db: Session = Depends(get_db)):
+def export_incident(id: int, db: Session = Depends(get_db)): # type: ignore
 
     incident = db.query(Incident).filter(Incident.id == id).first()
 

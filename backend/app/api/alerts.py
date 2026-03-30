@@ -31,17 +31,20 @@ async def create_alert(data: dict, db: Session = Depends(get_db)):
     count = data.get("count", 1)
     country_risk = data.get("country_risk", 2)
     source_ip = data.get("source_ip")
+    if not source_ip:
+        source_ip = "0.0.0.0"
 
     # 2️⃣ 🔥 Get IP reputation
     reputation = get_ip_reputation(source_ip)
 
     # 3️⃣ Calculate risk using new engine
-    calculated_risk = risk_score(
+    risk_data = risk_score(
         incoming_severity,
         count,
         country_risk,
         reputation
     )
+    calculated_risk = risk_data["score"]
 
     # 4️⃣ Auto severity from final risk
     final_severity = calculate_severity_from_risk(calculated_risk)
@@ -59,9 +62,9 @@ async def create_alert(data: dict, db: Session = Depends(get_db)):
 
 
     # 6️⃣ MITRE mapping
-    tactic, technique = map_mitre(alert.severity, alert.message)
-    alert.mitre_tactic = tactic
-    alert.mitre_technique = technique
+    tactic, technique = map_mitre(str(alert.severity), str(alert.message))
+    alert.mitre_tactic = tactic 
+    alert.mitre_technique = technique 
 
     db.add(alert)
     db.commit()

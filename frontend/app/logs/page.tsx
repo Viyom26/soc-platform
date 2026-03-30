@@ -35,6 +35,7 @@ type LogsResponse =
   | ParsedLog[]
   | {
       items?: ParsedLog[];
+      total?: number;
     };
 
 export default function LogsPage() {
@@ -49,7 +50,11 @@ export default function LogsPage() {
   const [error, setError] = useState('');
   const [progress, setProgress] = useState(0);
   const [totalLogs, setTotalLogs] = useState(0);
+  const [total, setTotal] = useState(0); // 🔥 ADD
   const tableRef = useRef<HTMLDivElement>(null);
+
+  const limit = 100; // 🔥 SAME AS API
+  const totalPages = Math.ceil(total / limit);
 
   const safe = (val: unknown) =>
     val === null || val === undefined || val === '' ? 'N/A' : String(val);
@@ -67,6 +72,7 @@ export default function LogsPage() {
 
       if (data && Array.isArray(data.items)) {
         setLogs(data.items);
+        setTotal(data.total || 0); // 🔥 ADD
         return data.items;
       }
 
@@ -467,6 +473,7 @@ export default function LogsPage() {
 
       <div className="pagination">
         <button
+          disabled={page >= totalPages}
           onClick={() => {
             const newPage = Math.max(1, page - 1);
             setPage(newPage);
@@ -481,9 +488,12 @@ export default function LogsPage() {
           Prev
         </button>
 
-        <span className="page-text">Page {page}</span>
+        <span className="page-text">
+          Page {page} of {totalPages || 1}
+        </span>
 
         <button
+          disabled={page >= totalPages}
           onClick={() => {
             const newPage = page + 1;
             setPage(newPage);

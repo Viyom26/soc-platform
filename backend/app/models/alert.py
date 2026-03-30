@@ -1,4 +1,5 @@
 from sqlalchemy import Column, String, DateTime, Integer, ForeignKey
+from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.orm import relationship
 from datetime import datetime
 import uuid
@@ -14,13 +15,13 @@ class Alert(Base):
     source_ip = Column(String, index=True)
     severity = Column(String, index=True)
 
-    risk_score = Column(Integer)
+    risk_score: Mapped[int | None] = mapped_column(nullable=True)
     reputation = Column(Integer, default=0)
 
     # ✅ MITRE ATT&CK FIELDS
-    mitre_tactic = Column(String)
-    mitre_technique = Column(String)
-
+    mitre_tactic: Mapped[str | None] = mapped_column(nullable=True)
+    mitre_technique: Mapped[str | None] = mapped_column(nullable=True)
+    
     classification = Column(String)
     message = Column(String)
 

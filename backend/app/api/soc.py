@@ -35,9 +35,11 @@ def ip_analysis(ip: str, db: Session = Depends(get_db)):
 
         # ✅ SAFE port detection
         port = log.destination_port or 0
-        if log.protocol == "HTTP":
+        protocol = str(log.protocol)
+
+        if protocol == "HTTP":
             port = 80
-        elif log.protocol == "HTTPS":
+        elif protocol == "HTTPS":
             port = 443
 
         ports.add(port)
@@ -47,7 +49,7 @@ def ip_analysis(ip: str, db: Session = Depends(get_db)):
         severities[severity] = severities.get(severity, 0) + 1
 
         # ✅ SAFE timestamp
-        ts = log.created_at or datetime.utcnow()
+        ts = log.created_at if isinstance(log.created_at, datetime) else datetime.utcnow()
 
         # Date-wise
         date_key = ts.strftime("%Y-%m-%d")
@@ -69,7 +71,10 @@ def ip_analysis(ip: str, db: Session = Depends(get_db)):
     threat_score = round(base_score + activity_score, 2)
 
     # ✅ SAFE first/last seen
-    timestamps = [log.created_at for log in logs if log.created_at]
+    timestamps = [
+        log.created_at for log in logs 
+        if isinstance(log.created_at, datetime)
+    ]
 
     first_seen = min(timestamps) if timestamps else None
     last_seen = max(timestamps) if timestamps else None

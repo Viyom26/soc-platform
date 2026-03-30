@@ -142,22 +142,16 @@ export default function SearchPage() {
                     <td className="p-2 text-green-400">
                       {r.source_ip || 'N/A'}
                     </td>
+
                     <td className="p-2 text-blue-400">
                       {r.destination_ip || 'N/A'}
                     </td>
-                    <td className="p-2">{r.source_ip || 'N/A'}</td>
-                    <td className="p-2">{r.destination_ip || 'N/A'}</td>
+
                     <td className="p-2">{r.source_port || 'N/A'}</td>
+
                     <td className="p-2">{r.destination_port || 'N/A'}</td>
+
                     <td className="p-2">{r.protocol || 'N/A'}</td>
-                    <td className="p-2">{r.severity || 'N/A'}</td>
-                    <td className="p-2">{r.risk_score ?? 'N/A'}</td>
-                    <td className="p-2">{r.message || 'N/A'}</td>
-                    <td className="p-2">
-                      {r.created_at
-                        ? new Date(r.created_at).toLocaleString()
-                        : 'N/A'}
-                    </td>
 
                     <td
                       className="p-2 font-semibold"
@@ -176,6 +170,7 @@ export default function SearchPage() {
                     </td>
 
                     <td className="p-2">{r.risk_score ?? 'N/A'}</td>
+
                     <td className="p-2">{r.message || 'N/A'}</td>
 
                     <td className="p-2">

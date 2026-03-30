@@ -11,6 +11,7 @@ def get_prediction(db: Session = Depends(get_db)):
 
     alerts = db.query(Alert).order_by(Alert.id).all()
 
+    # ✅ No data case
     if not alerts:
         return {
             "current": [],
@@ -19,8 +20,13 @@ def get_prediction(db: Session = Depends(get_db)):
             "status": "No Data"
         }
 
-    risk_values = [a.risk_score for a in alerts if a.risk_score is not None]
+    # ✅ Ensure proper int conversion (fixes Pylance issues)
+    risk_values = []
+    for a in alerts:
+        if a.risk_score is not None:
+            risk_values.append(int(a.risk_score))
 
+    # ✅ Not enough data
     if len(risk_values) < 2:
         return {
             "current": risk_values,
@@ -29,15 +35,18 @@ def get_prediction(db: Session = Depends(get_db)):
             "status": "Collecting Data"
         }
 
+    # ✅ Last 8 values
     current = risk_values[-8:]
 
+    # ✅ Prediction logic
     predicted = []
-
     for r in current:
-        predicted.append(min(100, int(r * 1.1)))
+        predicted.append(min(100, int(float(r) * 1.1)))
 
-    delta = current[-1] - current[-2]
+    # ✅ Delta calculation (explicit int)
+    delta = int(current[-1]) - int(current[-2])
 
+    # ✅ Status logic
     status = "Risk Rising" if delta > 0 else "System Stable"
 
     return {
