@@ -1,10 +1,18 @@
-from sqlalchemy import Column, String, Integer, DateTime
+from sqlalchemy import Column, String, Integer, DateTime, Index
 from datetime import datetime
 from app.database import Base
 
 
 class ThreatLog(Base):
     __tablename__ = "threat_logs"
+
+    # ✅ PASTE HERE (JUST BELOW __tablename__)
+    __table_args__ = (
+        Index("idx_source_ip", "source_ip"),
+        Index("idx_destination_ip", "destination_ip"),
+        Index("idx_severity", "severity"),
+        Index("idx_protocol", "protocol"),
+    )
 
     id = Column(String, primary_key=True, index=True)
 
@@ -27,7 +35,7 @@ class ThreatLog(Base):
     created_at = Column(DateTime, nullable=True, index=True)  # ✅ UPDATED
 
     # ✅ NEW (DO NOT REMOVE ANYTHING ABOVE)
-    ingested_at = Column(DateTime, default=datetime.utcnow)
+    ingested_at = Column(DateTime, default=datetime.utcnow, index=True)
 
     source_port = Column(String, nullable=True)
 

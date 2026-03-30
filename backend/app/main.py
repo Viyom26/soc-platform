@@ -17,7 +17,7 @@ from app.models.audit_log import AuditLog
 from app.models.threat_log import ThreatLog
 from app.database import SessionLocal
 from app.routes import ip_intelligence
-from app.routes import detection_rules
+
 from app.routes import rules
 from app.routes import mitre
 from app.routes import attack_timeline
@@ -52,7 +52,7 @@ from app.routes import actions
 from app.routes import assets
 from app.models.user import User
 from app.services.rule_loader import load_default_rules
-
+from app.api import soc
 # ================= INIT =================
 
 from sqlalchemy.exc import OperationalError, SQLAlchemyError, IntegrityError  # ✅ UPDATED
@@ -150,7 +150,7 @@ app.include_router(mitre.router)
 app.include_router(history.router)
 app.include_router(geo_map.router)
 app.include_router(audit.router)
-
+app.include_router(soc.router)
 # ✅ WebSocket (your main one)
 app.include_router(ws.router)
 
@@ -171,7 +171,7 @@ app.include_router(ai_prediction_router)
 app.include_router(alerts.router)
 
 app.include_router(ip_intelligence.router)
-app.include_router(detection_rules.router)
+
 app.include_router(rules.router)
 
 app.include_router(attack_timeline.router)

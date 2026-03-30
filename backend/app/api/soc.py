@@ -1,9 +1,9 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
 
 from app.database import get_db
-from app.models.log import Log  # pyright: ignore[reportMissingImports]
+from app.models.threat_log import ThreatLog as Log
 from app.services.score import calculate_ip_score
 
 from datetime import datetime  # ✅ NEW
@@ -47,7 +47,7 @@ def ip_analysis(ip: str, db: Session = Depends(get_db)):
         severities[severity] = severities.get(severity, 0) + 1
 
         # ✅ SAFE timestamp
-        ts = log.timestamp or datetime.utcnow()
+        ts = log.created_at or datetime.utcnow()
 
         # Date-wise
         date_key = ts.strftime("%Y-%m-%d")
@@ -69,7 +69,7 @@ def ip_analysis(ip: str, db: Session = Depends(get_db)):
     threat_score = round(base_score + activity_score, 2)
 
     # ✅ SAFE first/last seen
-    timestamps = [log.timestamp for log in logs if log.timestamp]
+    timestamps = [log.created_at for log in logs if log.created_at]
 
     first_seen = min(timestamps) if timestamps else None
     last_seen = max(timestamps) if timestamps else None
@@ -89,3 +89,75 @@ def ip_analysis(ip: str, db: Session = Depends(get_db)):
         "port_scan_detected": port_scan_detected,
         "threat_score": threat_score
     }
+    
+# ================= PAGINATED LOGS API =================
+
+@router.get("/logs")
+def get_logs_paginated(
+    page: int = Query(1, ge=1),
+    limit: int = Query(100, ge=1, le=1000),
+    db: Session = Depends(get_db)
+):
+    offset = (page - 1) * limit
+
+    total = db.query(Log).count()
+
+    logs = (
+    db.query(Log)
+    .with_entities(
+        Log.source_ip,
+        Log.destination_ip,
+        Log.source_port,
+        Log.destination_port,
+        Log.protocol,
+        Log.classification,
+        Log.message,
+        Log.severity,
+        Log.risk_score,
+        Log.mitre_tactic,
+        Log.mitre_technique,
+        Log.status,
+        Log.created_at,
+    )
+    .order_by(Log.created_at.desc())
+    .offset(offset)
+    .limit(limit)
+    .all()
+)
+
+    return {
+    "total": total,
+    "page": page,
+    "limit": limit,
+    "items": [
+    {
+        "src_ip": l.source_ip,
+        "dst_ip": l.destination_ip,
+        "src_port": l.source_port,
+        "dst_port": l.destination_port,
+
+        # 🔥 NETWORK
+        "protocol": l.protocol,
+
+        # 🔥 AI DETECTION
+        "threat": l.classification or l.message,
+        "message": l.message,
+        "classification": l.classification,
+
+        # 🔥 SEVERITY + SCORE
+        "severity": l.severity,
+        "risk_score": l.risk_score,
+
+        # 🔥 MITRE ATTACK
+        "mitre_tactic": l.mitre_tactic,
+        "mitre_technique": l.mitre_technique,
+
+        # 🔥 STATUS
+        "status": l.status,
+
+        # 🔥 TIME
+        "event_time": l.created_at.isoformat() if l.created_at else None,
+    }
+    for l in logs
+]
+}

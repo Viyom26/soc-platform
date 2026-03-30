@@ -2,7 +2,8 @@
 
 import './logs.css';
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { apiFetch } from '@/lib/api';
+import { apiFetch, getLogs } from '@/lib/api';
+import { useRouter } from 'next/navigation';
 import Card from '@/components/ui/Card';
 import HistoryPanel from '@/components/HistoryPanel';
 
@@ -11,8 +12,21 @@ type ParsedLog = {
   dst_ip?: string;
   src_port?: string;
   dst_port?: string;
+
   protocol?: string;
+
   threat?: string;
+  message?: string;
+  classification?: string;
+
+  severity?: string;
+  risk_score?: number;
+
+  mitre_tactic?: string;
+  mitre_technique?: string;
+
+  status?: string;
+
   event_time?: string;
   created_at?: string;
 };
@@ -25,6 +39,7 @@ type LogsResponse =
 
 export default function LogsPage() {
   const [rawText, setRawText] = useState('');
+  const router = useRouter();
   const [file, setFile] = useState<File | null>(null);
   const [fileName, setFileName] = useState('');
   const [logs, setLogs] = useState<ParsedLog[]>([]);
@@ -43,7 +58,7 @@ export default function LogsPage() {
 
   const fetchLogs = useCallback(async () => {
     try {
-      const data: LogsResponse = await apiFetch('/logs');
+      const data: LogsResponse = await getLogs(page, 100);
 
       if (Array.isArray(data)) {
         setLogs(data);
@@ -62,7 +77,7 @@ export default function LogsPage() {
       setLogs([]);
       return [];
     }
-  }, []);
+  }, [page]);
 
   /* ================= SEARCH LOGS ================= */
 
@@ -332,7 +347,13 @@ export default function LogsPage() {
                   <th>Source Port</th>
                   <th>Destination Port</th>
                   <th>Protocol</th>
+
+                  <th>Severity</th>
+                  <th>Risk</th>
                   <th>Threat</th>
+                  <th>MITRE</th>
+                  <th>Status</th>
+
                   <th>Event Time</th>
                 </tr>
               </thead>
@@ -361,30 +382,32 @@ export default function LogsPage() {
                       }}
                     >
                       <td
+                        onClick={() =>
+                          l.src_ip && router.push(`/ip-analyzer?ip=${l.src_ip}`)
+                        }
                         style={{
                           color:
                             searchQuery && l.src_ip?.includes(searchQuery)
                               ? '#3b82f6'
-                              : 'inherit',
-                          fontWeight:
-                            searchQuery && l.src_ip?.includes(searchQuery)
-                              ? 'bold'
-                              : 'normal',
+                              : '#22c55e',
+                          fontWeight: 'bold',
+                          cursor: 'pointer',
                         }}
                       >
                         {safe(l.src_ip)}
                       </td>
 
                       <td
+                        onClick={() =>
+                          l.dst_ip && router.push(`/ip-analyzer?ip=${l.dst_ip}`)
+                        }
                         style={{
                           color:
                             searchQuery && l.dst_ip?.includes(searchQuery)
                               ? '#3b82f6'
-                              : 'inherit',
-                          fontWeight:
-                            searchQuery && l.dst_ip?.includes(searchQuery)
-                              ? 'bold'
-                              : 'normal',
+                              : '#38bdf8',
+                          fontWeight: 'bold',
+                          cursor: 'pointer',
                         }}
                       >
                         {safe(l.dst_ip)}
@@ -392,7 +415,32 @@ export default function LogsPage() {
                       <td>{safe(l.src_port)}</td>
                       <td>{safe(l.dst_port)}</td>
                       <td>{safe(l.protocol)}</td>
+
+                      <td
+                        style={{
+                          color:
+                            l.severity === 'CRITICAL'
+                              ? '#ef4444'
+                              : l.severity === 'HIGH'
+                                ? '#f97316'
+                                : l.severity === 'MEDIUM'
+                                  ? '#eab308'
+                                  : '#22c55e',
+                        }}
+                      >
+                        {safe(l.severity)}
+                      </td>
+
+                      <td>{safe(l.risk_score)}</td>
+
                       <td>{safe(l.threat)}</td>
+
+                      <td>
+                        {safe(l.mitre_tactic)} / {safe(l.mitre_technique)}
+                      </td>
+
+                      <td>{safe(l.status)}</td>
+
                       <td>
                         {time
                           ? new Date(time).toLocaleString('en-IN', {
