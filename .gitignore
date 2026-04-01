@@ -18,3 +18,19 @@ GeoLite2-City.mmdb
 # OS files
 .DS_Store
 Thumbs.db
+
+# VS Code
+.vscode/
+
+# Logs
+*.log
+
+# Docker
+*.env.local
+
+# Build
+.next/
+dist/
+
+# Python cache
+*.pyo
