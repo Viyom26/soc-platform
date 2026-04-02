@@ -1,12 +1,58 @@
-node_modules
-.next
-.env
-.git
-__pycache__
+# =========================
+# Python
+# =========================
+__pycache__/
 *.pyc
+*.pyo
+*.pyd
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# =========================
+# Logs & uploads
+# =========================
 *.log
-uploads
-venv
-.venv
-dist
-build
+logs/
+uploads/
+
+# =========================
+# Environment variables
+# =========================
+.env
+
+# =========================
+# VS Code
+# =========================
+.vscode/
+
+# =========================
+# GeoIP Database (VERY IMPORTANT - large file)
+# =========================
+backend/GeoLite2-City_*/
+
+# =========================
+# Assets (optional - remove if you want to push logos)
+# =========================
+backend/app/assets/
+
+# =========================
+# Frontend (Next.js)
+# =========================
+node_modules/
+.next/
+dist/
+build/
+
+# =========================
+# Git
+# =========================
+.git
+
+# =========================
+# OS files
+# =========================
+.DS_Store
+Thumbs.db

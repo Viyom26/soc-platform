@@ -1,5 +1,6 @@
+from email.mime import message
 from gettext import find
-from logging import log
+from logging import critical, log
 from unittest import result
 import uuid
 import re
@@ -10,6 +11,7 @@ import asyncio
 from fastapi.concurrency import run_in_threadpool
 from datetime import datetime, timezone
 from typing import Optional
+from reportlab.lib import styles # pyright: ignore[reportMissingModuleSource]
 from sqlalchemy import or_
 from fastapi import APIRouter, Form, UploadFile, File, Depends, BackgroundTasks
 from sqlalchemy.orm import Session
@@ -31,7 +33,9 @@ from app.services.audit_service import log_action
 from app.services.correlation_engine import correlate_alert
 from app.services.automation_engine import auto_response
 from app.models import alert
+from fastapi import Body
 
+from app.routes import incidents
 router = APIRouter(prefix="/logs", tags=["Logs"])
 
 DEFAULT_SOC_TARGET = "192.168.1.10"
@@ -112,7 +116,11 @@ def get_logs(
                 "dst_port": log.destination_port,
                 "protocol": log.protocol,
                 "severity": log.severity,
-                "risk": log.risk_score,     # ✅ ADD THIS
+
+                # 🔥 FIX START
+                "risk_score": log.risk_score if log.risk_score is not None else 0,
+                # 🔥 FIX END
+
                 "status": log.status, 
                 "threat": log.message,
                 "created_at": log.created_at.isoformat() if log.created_at else None,  # ✅ FIX HERE # type: ignore
@@ -471,6 +479,22 @@ def process_logs(file_path, filename, username):
                         }
 
                         alerts_to_stream.append(alert_data)
+                        # 🔥 REAL-TIME EMAIL ALERT
+                        try:
+                            if severity in ["CRITICAL", "HIGH"]:
+                                send_email_with_pdf(
+                                    None,
+                                    username,
+                                    {
+                                        "CRITICAL": 1 if severity == "CRITICAL" else 0,
+                                        "HIGH": 1 if severity == "HIGH" else 0,
+                                        "MEDIUM": 0,
+                                        "LOW": 0
+                                    },
+                                    [{"ip": source_ip, "count": 1}]  # 🔥 ADD THIS
+                                )
+                        except Exception as e:
+                            print("Real-time email failed:", e)
                 except Exception as e:
                     print("Detection engine error:", e)
 
@@ -618,7 +642,14 @@ def search_logs(
             "dst_port": log.destination_port or "N/A",
             "protocol": log.protocol or "UNKNOWN",
             "severity": log.severity or "LOW",
-            "risk": log.risk_score,      # ✅ ADD
+            "severity": log.severity or "LOW",
+
+            # 🔥 FIX START (PASTE HERE)
+            "risk_score": log.risk_score if log.risk_score is not None else 0,
+            # 🔥 FIX END
+
+            "status": log.status,
+            "threat": log.message or "N/A",      # ✅ ADD
             "status": log.status, 
             "threat": log.message or "N/A",
             "created_at": log.created_at.isoformat() if log.created_at else None, # type: ignore
@@ -655,13 +686,695 @@ def threat_hunt(
             "dst_ip": log.destination_ip,
             "protocol": log.protocol,
             "severity": log.severity,
-            "risk": log.risk_score,     # ✅ ADD THIS
+            "risk_score": log.risk_score if log.risk_score is not None else 0,     # ✅ ADD THIS
             "status": log.status, 
             "threat": log.message,
             "time": log.created_at.isoformat() if log.created_at else None # type: ignore
         })
 
     return {"items": items}
+
+# ================= PDF DOWNLOAD =================
+
+from fastapi.responses import StreamingResponse
+from reportlab.platypus import Flowable, SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image # type: ignore
+from reportlab.lib import colors # type: ignore
+from reportlab.lib.styles import getSampleStyleSheet # pyright: ignore[reportMissingModuleSource]
+from reportlab.graphics.shapes import Drawing # pyright: ignore[reportMissingModuleSource]
+from reportlab.graphics.charts.barcharts import VerticalBarChart # pyright: ignore[reportMissingModuleSource]
+import io
+import smtplib
+from email.message import EmailMessage
+from datetime import datetime
+from collections import Counter
+
+# ✅ GEOIP SAFE IMPORT
+try:
+    import geoip2.database # pyright: ignore[reportMissingImports]
+except ImportError:
+    geoip2 = None
+
+# ================= AI SCORE =================
+def ai_threat_score(severity, message):
+
+    score = 0
+
+    if severity == "CRITICAL":
+        score += 90
+    elif severity == "HIGH":
+        score += 70
+    elif severity == "MEDIUM":
+        score += 50
+    else:
+        score += 20
+
+    msg = (message or "").lower()
+
+    if "malware" in msg:
+        score += 10
+    if "attack" in msg:
+        score += 10
+    if "unauthorized" in msg:
+        score += 5
+    if "scan" in msg:
+        score += 5
+
+    return min(score, 100)
+
+
+# ================= AI CLASSIFIER =================
+def classify_threat(text: str):
+    t = (text or "").lower()
+
+    if "sql" in t:
+        return "SQL Injection"
+    elif "brute" in t or "login failed" in t:
+        return "Brute Force"
+    elif "scan" in t:
+        return "Port Scan"
+    elif "malware" in t:
+        return "Malware"
+    return "General Threat"
+
+
+@router.post("/download")
+def download_logs_pdf(
+    logs: list = Body(...),
+    company: str = Body(default="AegisCyber SOC"),
+    analyst: str = Body(default="SOC Analyst"),
+    user_email: Optional[str] = Body(default=None)  
+    
+):
+
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=(600, 800),
+        rightMargin=20,
+        leftMargin=20,
+        topMargin=20,
+        bottomMargin=30
+    )
+    
+    # 🔥 ENTERPRISE HEADER (ADD HERE)
+    def draw_header(canvas, doc):
+        canvas.saveState()
+
+        # Logo
+        logo_path = os.path.join(os.getcwd(), "app", "assets", "logo.png")
+        if os.path.exists(logo_path):
+            canvas.drawImage(logo_path, 30, 750, width=35, height=35)
+
+        # Title
+        canvas.setFont("Helvetica-Bold", 14)
+        canvas.setFillColor(colors.white)
+        canvas.drawString(80, 770, f"{company} - SOC Report")
+
+        # Date
+        canvas.setFont("Helvetica", 9)
+        canvas.drawRightString(570, 770, datetime.now().strftime("%Y-%m-%d %H:%M"))
+
+        canvas.restoreState()
+
+    def add_footer(canvas, doc):
+        canvas.saveState()
+
+        # Dark footer strip
+        canvas.setFillColorRGB(0.1, 0.1, 0.1)
+        canvas.rect(0, 0, doc.pagesize[0], 25, fill=1)
+
+        canvas.setFillColor(colors.white)
+        canvas.setFont("Helvetica", 8)
+
+        canvas.drawString(30, 10, "QuickSOC | Confidential Security Report")
+        canvas.drawRightString(570, 10, f"Page {doc.page}")
+
+        canvas.restoreState()
+    styles = getSampleStyleSheet()
+    styles["Normal"].textColor = colors.white
+    styles["Heading2"].textColor = colors.lime
+    styles["Title"].textColor = colors.aqua
+
+    elements = []
+    
+    from reportlab.platypus import Spacer # type: ignore
+
+    elements.append(Spacer(1, 10))  # 🔥 small top padding (fix gap)
+
+    # ================= BACKGROUND =================
+    from reportlab.platypus import Flowable # type: ignore
+
+    # 🔥 DARK BACKGROUND (HACKER STYLE)
+    from reportlab.platypus import Flowable # type: ignore
+
+    class Background(Flowable):
+        def draw(self):
+            self.canv.setFillColorRGB(0.05, 0.07, 0.12)  # dark blue-black
+            self.canv.rect(0, 0, 600, 800, fill=1)
+
+    elements.append(Background())
+
+    # ================= HEADER =================
+    elements.append(Paragraph(
+        f"<para align='center'><font size=26 color='#00ffcc'><b>{company}</b></font></para>",
+        styles["Title"]
+    ))
+    logo_path = os.path.join(os.getcwd(), "app", "assets", "logo.png")
+
+    if os.path.exists(logo_path):
+        try:
+            logo = Image(logo_path, width=40, height=40)
+            logo.hAlign = 'CENTER'
+            elements.append(logo)
+        except:
+            print("Logo failed")
+    elements.append(Spacer(1, 2))
+    elements.append(Paragraph(
+        "<para align='center'><font size=10 color='#38bdf8'>AI Threat Intelligence • Real-Time Detection • Cyber Defense System</font></para>",
+        styles["Normal"]
+    ))
+    elements.append(Spacer(1, 6))
+    
+
+    elements.append(Paragraph(
+        "<para align='center'><font size=14><b>Security Operations Center Report</b></font></para>",
+        styles["Normal"]
+    ))
+    elements.append(Spacer(1, 6))
+
+    elements.append(Paragraph(f"<b>Generated On:</b> {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", styles["Normal"]))
+    elements.append(Paragraph(f"<b>Prepared By:</b> {analyst}", styles["Normal"]))
+    elements.append(Paragraph("<b>System:</b> SOC Threat Monitoring Platform", styles["Normal"]))
+
+    elements.append(Spacer(1, 10))
+
+    # ================= INCIDENT FILTER =================
+    incidents = [
+        log for log in logs
+        if log.get("severity", "").upper() in ["MEDIUM", "HIGH", "CRITICAL"]
+    ]
+    
+    severity_counts = Counter(
+    log.get("severity", "LOW").upper() for log in incidents
+    )
+    # 🔥 FIX: DEFINE email_summary
+    email_summary = {
+        "CRITICAL": severity_counts.get("CRITICAL", 0),
+        "HIGH": severity_counts.get("HIGH", 0),
+        "MEDIUM": severity_counts.get("MEDIUM", 0),
+        "LOW": severity_counts.get("LOW", 0),
+    }
+
+    if not incidents:
+        elements.append(Paragraph("No security incidents found.", styles["Normal"]))
+    
+    
+    # ================= SUMMARY =================
+    elements.append(Paragraph(
+        "<font color='#00ff00'><b>[ SYSTEM ANALYSIS REPORT ]</b></font>",
+        styles["Heading2"]
+    ))
+    summary_box = Table([[
+        f"Logs: {len(logs)}",
+        f"Incidents: {len(incidents)}",
+        f"Critical: {severity_counts.get('CRITICAL',0)}",
+        f"High: {severity_counts.get('HIGH',0)}",
+        f"Medium: {severity_counts.get('MEDIUM',0)}"
+    ]])
+
+    summary_box.setStyle(TableStyle([
+        ("BACKGROUND", (0,0), (-1,-1), colors.black),
+        ("TEXTCOLOR", (0,0), (-1,-1), colors.lime),
+        ("GRID", (0,0), (-1,-1), 0.5, colors.green),
+        ("ALIGN", (0,0), (-1,-1), "CENTER"),
+    ]))
+    
+    # ================= EXECUTIVE SUMMARY =================
+    elements.append(Spacer(1, 12))
+    elements.append(Paragraph("<b>📄 Executive Summary</b>", styles["Heading2"]))
+
+    summary_text = f"""
+    Total {len(incidents)} security incidents detected.
+    Majority are {severity_counts.get('MEDIUM',0)} medium-level threats.
+    No critical breaches observed.
+    System is stable but requires monitoring.
+    """
+
+    elements.append(Paragraph(summary_text, styles["Normal"]))
+
+    elements.append(summary_box)
+    elements.append(Spacer(1, 8))
+    elements.append(Table([[""]], colWidths=[550], rowHeights=[2],
+        style=[("BACKGROUND", (0,0), (-1,-1), colors.HexColor("#22c55e"))]
+    ))  # green separator line
+    
+    # 🔥 SEVERITY COLOR BAR (ADD HERE)
+    severity_bar = Table([[
+        f"CRITICAL ({severity_counts.get('CRITICAL',0)})",
+        f"HIGH ({severity_counts.get('HIGH',0)})",
+        f"MEDIUM ({severity_counts.get('MEDIUM',0)})",
+        f"LOW ({severity_counts.get('LOW',0)})"
+    ]])
+
+    severity_bar.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (0,0), colors.red),
+        ('BACKGROUND', (1,0), (1,0), colors.orange),
+        ('BACKGROUND', (2,0), (2,0), colors.yellow),
+        ('BACKGROUND', (3,0), (3,0), colors.green),
+
+        ('TEXTCOLOR', (0,0), (-1,-1), colors.white),
+        ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+        ('FONTNAME', (0,0), (-1,-1), 'Helvetica-Bold'),
+    ]))
+
+    elements.append(Spacer(1, 10))
+    elements.append(severity_bar)
+    
+    # ================= TOP ATTACKERS (MOVE HERE) =================
+    ip_counts = Counter()
+    for log in incidents:
+        ip = log.get("src_ip")
+        if ip:
+            ip_counts[ip] += 1
+
+    top_ips = ip_counts.most_common(5)
+
+    # ================= AI ANALYSIS =================
+    ai_text = "No major threats detected."
+
+    if severity_counts.get("CRITICAL", 0) > 0:
+        ai_text = "Critical threats detected. Immediate action required."
+    elif severity_counts.get("HIGH", 0) > 0:
+        ai_text = "High-risk activity observed. Investigation recommended."
+    elif severity_counts.get("MEDIUM", 0) > 0:
+        ai_text = "Moderate suspicious activity detected. Monitor closely."
+    else:
+        ai_text = "System operating normally."
+
+    elements.append(Spacer(1, 10))
+    elements.append(Paragraph(
+        "<font color='#00ffff'><b>🧠 AI Threat Analysis</b></font>",
+        styles["Heading2"]
+    ))
+
+    primary_threat = max(severity_counts.keys(), key=lambda k: severity_counts[k]) if severity_counts else "None"
+
+    detailed_ai = f"""
+    The system analyzed {len(logs)} logs and identified {len(incidents)} threats.
+
+    Top attacker IP: {top_ips[0][0] if top_ips else "N/A"}  
+    Most common severity: {primary_threat}
+
+    ⚠ Risk Insight:
+    Repeated traffic patterns suggest automated attack behavior.
+
+    ✅ Recommended Actions:
+    - Block high-frequency IPs
+    - Enable IDS/IPS rules
+    - Monitor unusual traffic spikes
+    """
+
+    elements.append(Paragraph(detailed_ai, styles["Normal"]))
+    elements.append(Spacer(1, 8))
+    elements.append(Table([[""]], colWidths=[550], rowHeights=[2],
+        style=[("BACKGROUND", (0,0), (-1,-1), colors.HexColor("#06b6d4"))]
+    ))  # cyan separator line
+    
+    # ================= CHART =================
+    elements.append(Paragraph("<b>📈 Threat Distribution</b>", styles["Heading2"]))
+    chart_data = [
+        severity_counts.get("CRITICAL", 0),
+        severity_counts.get("HIGH", 0),
+        severity_counts.get("MEDIUM", 0),
+    ]
+
+    drawing = Drawing(400, 200)
+    chart = VerticalBarChart()
+
+    chart.x = 50
+    chart.y = 30
+    chart.height = 125
+    chart.width = 300
+    chart.data = [[
+        max(1, severity_counts.get("CRITICAL", 0)),
+        max(1, severity_counts.get("HIGH", 0)),
+        max(1, severity_counts.get("MEDIUM", 0))
+    ]]
+    chart.valueAxis.valueMax = max(chart_data) + 10
+    chart.valueAxis.valueStep = max(1, int(max(chart_data) / 5))
+    chart.bars[0].fillColor = colors.HexColor("#38bdf8")  # clean blue (enterprise look)
+    chart.bars[1].fillColor = colors.HexColor("#f97316")  # orange (enterprise look)
+    chart.bars[2].fillColor = colors.HexColor("#eab308")  # yellow (enterprise look)
+
+    chart.categoryAxis.categoryNames = ["Critical", "High", "Medium"]
+
+    drawing.add(chart)
+    elements.append(drawing)
+
+    elements.append(Spacer(1, 20))
+    
+    elements.append(Paragraph("<b>🕒 Attack Timeline</b>", styles["Heading2"]))
+
+    timeline_counts = {}
+
+    for log in incidents[:50]:
+        time = log.get("created_at", "")
+        if time:
+            hour = time[:13]  # YYYY-MM-DD HH
+            timeline_counts[hour] = timeline_counts.get(hour, 0) + 1
+
+    timeline_data = list(timeline_counts.values())[:10]
+    timeline_labels = list(timeline_counts.keys())[:10]
+
+    if timeline_data:
+        drawing2 = Drawing(400, 200)
+        chart2 = VerticalBarChart()
+
+        chart2.x = 50
+        chart2.y = 30
+        chart2.height = 125
+        chart2.width = 300
+        chart2.data = [timeline_data]
+        chart2.categoryAxis.categoryNames = timeline_labels
+
+        drawing2.add(chart2)
+        elements.append(drawing2)
+
+    elements.append(Spacer(1, 20))
+    
+    # ================= TOP ATTACKERS =================
+
+    elements.append(Paragraph("<b>🎯 Top Attacker IPs</b>", styles["Heading2"]))
+
+    # 🔥 ADD THIS (PASS TO EMAIL)
+    top_attackers_list = [
+        {"ip": ip, "count": count}
+        for ip, count in top_ips
+    ]
+
+    ip_table_data = [["IP Address", "Attack Count"]]
+
+    for ip, count in top_ips:
+        ip_table_data.append([ip, str(count)])
+
+    ip_table = Table(ip_table_data)
+
+    ip_table.setStyle(TableStyle([
+        ("BACKGROUND", (0,0), (-1,0), colors.black),
+        ("TEXTCOLOR", (0,0), (-1,0), colors.lime),
+        ("GRID", (0,0), (-1,-1), 0.3, colors.green),
+    ]))
+
+    elements.append(ip_table)
+    elements.append(Spacer(1, 15))
+    elements.append(Table([[""]], colWidths=[550], rowHeights=[2],
+    style=[("BACKGROUND", (0,0), (-1,-1), colors.HexColor("#f97316"))]
+    ))  # orange separator line
+    
+    if top_ips:
+        elements.append(Paragraph(
+            f"<b>🔥 Most Active Attacker:</b> {top_ips[0][0]} ({top_ips[0][1]} attacks)",
+            styles["Normal"]
+        ))      
+
+    # ================= GEOIP =================
+    elements.append(Paragraph("<b>🌐 Geo Intelligence</b>", styles["Heading2"]))
+    geo_summary = {}
+
+    try:
+        if geoip2:
+            reader = geoip2.database.Reader("GeoLite2-City.mmdb")
+        else:
+            reader = None
+
+        for log in incidents:
+            ip = log.get("src_ip")
+            if not reader:
+                continue
+
+            try:
+                response = reader.city(ip)
+                country = response.country.name
+                geo_summary[country] = geo_summary.get(country, 0) + 1
+            except:
+                pass
+    except:
+        pass
+
+    if geo_summary:
+        geo_text = "<b>Geo Distribution:</b><br/>"
+        for k, v in geo_summary.items():
+            geo_text += f"{k}: {v}<br/>"
+
+        elements.append(Paragraph(geo_text, styles["Normal"]))
+        elements.append(Spacer(1, 20))
+        
+        elements.append(Paragraph("<b>🔥 Risk Heat Distribution</b>", styles["Heading2"]))
+
+    risk_counts = {"LOW": 0, "MEDIUM": 0, "HIGH": 0, "CRITICAL": 0}
+
+    for log in incidents:
+        sev = log.get("severity", "LOW").upper()
+        if sev in risk_counts:
+            risk_counts[sev] += 1
+
+    heat_data = [[
+        "LOW", "MEDIUM", "HIGH", "CRITICAL"
+    ], [
+        risk_counts["LOW"],
+        risk_counts["MEDIUM"],
+        risk_counts["HIGH"],
+        risk_counts["CRITICAL"]
+    ]]
+
+    heat_table = Table(heat_data)
+
+    heat_table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), colors.black),
+        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+
+        ("BACKGROUND", (0, 1), (0, 1), colors.green),
+        ("BACKGROUND", (1, 1), (1, 1), colors.yellow),
+        ("BACKGROUND", (2, 1), (2, 1), colors.orange),
+        ("BACKGROUND", (3, 1), (3, 1), colors.red),
+
+        ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+    ]))
+
+    elements.append(heat_table)
+    elements.append(Spacer(1, 20))
+
+    # ================= TABLE =================
+    elements.append(Paragraph("<b>🚨 Incident Details</b>", styles["Heading2"]))
+    elements.append(Paragraph(
+        "<font color='#facc15'>Showing Top 25 Incidents</font>",
+        styles["Normal"]
+    ))
+    data = [[
+        "Source IP",
+        "Severity",
+        "AI Type",
+        "AI Score",
+        "Risk",
+        "Message"
+    ]]
+
+    for log in incidents[:50]:
+        ai_score = ai_threat_score(
+            log.get("severity"),
+            log.get("threat")
+        )
+
+        data.append([
+            log.get("src_ip", "N/A"),                log.get("severity", "N/A"),
+            classify_threat(log.get("threat")),
+            str(ai_score),
+            str(log.get("risk") or log.get("risk_score") or "N/A"),
+            log.get("threat", "N/A")[:40]
+        ])
+
+    table = Table(data[:26], repeatRows=1)
+
+    # ✅ MUST MATCH 6 COLUMNS
+    table._argW = [70, 60, 80, 60, 50, 200]# type: ignore # control width
+
+    table.setStyle(TableStyle([
+        ("TEXTCOLOR", (3,1), (3,-1), colors.cyan),
+        ("BACKGROUND", (0, 0), (-1, 0), colors.black),
+        ("TEXTCOLOR", (0, 0), (-1, 0), colors.lime),
+
+        ("GRID", (0, 0), (-1, -1), 0.2, colors.green),
+
+        ("BACKGROUND", (0, 1), (-1, -1), colors.HexColor("#0f172a")),
+        ("TEXTCOLOR", (0, 1), (-1, -1), colors.white),
+
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("FONTSIZE", (0, 0), (-1, -1), 8),
+    ]))
+
+    elements.append(table)
+
+    doc.build(
+        elements,
+        onFirstPage=lambda c, d: (draw_header(c, d), add_footer(c, d)),
+        onLaterPages=lambda c, d: (draw_header(c, d), add_footer(c, d))
+    )
+    buffer.seek(0)
+    
+    # 🔥 AUTO EMAIL SEND
+    try:
+        if severity_counts.get("HIGH",0) > 0 or severity_counts.get("CRITICAL",0) > 0:
+            company_email = os.getenv("EMAIL_USER")
+
+            # Send to company
+            if company_email:
+                send_email_with_pdf(
+                    buffer.getvalue(),
+                    company_email,
+                    email_summary,
+                    top_attackers_list
+                )
+
+            # Send to user
+            if user_email:
+                send_email_with_pdf(
+                    buffer.getvalue(),
+                    user_email,
+                    email_summary,
+                    top_attackers_list
+                )
+    except Exception as e:
+        print("Email error:", e)
+    
+    buffer.seek(0)
+
+    return StreamingResponse(
+        buffer,
+        media_type="application/pdf",
+        headers={"Content-Disposition": "attachment; filename=SOC_Report.pdf"}
+    )
+    
+    # ================= EMAIL FUNCTION =================
+def send_email_with_pdf(pdf_bytes, recipient_email, summary=None, top_attackers=None):
+
+    # 🔥 ADD THIS BLOCK (CHART IMAGE)
+    import matplotlib.pyplot as plt # pyright: ignore[reportMissingModuleSource]
+    import base64
+    from io import BytesIO
+
+    critical = summary.get("CRITICAL", 0) if summary else 0
+    high = summary.get("HIGH", 0) if summary else 0
+    medium = summary.get("MEDIUM", 0) if summary else 0
+    low = summary.get("LOW", 0) if summary else 0
+
+    fig, ax = plt.subplots()
+    ax.bar(["Critical", "High", "Medium", "Low"], [critical, high, medium, low])
+    ax.set_title("Threat Distribution")
+
+    img_buffer = BytesIO()
+    plt.savefig(img_buffer, format="png")
+    plt.close(fig)
+
+    img_base64 = base64.b64encode(img_buffer.getvalue()).decode()
+
+    # 🔥 AI SUMMARY
+    if critical > 0:
+        ai_summary = "Critical threats detected. Immediate action required."
+    elif high > 0:
+        ai_summary = "High risk activity observed."
+    elif medium > 0:
+        ai_summary = "Moderate suspicious activity detected."
+    else:
+        ai_summary = "System operating normally."
+
+    print("📧 Sending email to:", recipient_email)
+    
+    msg = EmailMessage()
+    msg["Subject"] = "SOC Threat Report"
+    msg["From"] = os.getenv("EMAIL_USER")
+    msg["To"] = recipient_email
+    
+    # 🔥 DYNAMIC TOP ATTACKERS HTML
+    top_attackers_html = "<ul>"
+
+    if top_attackers:
+        for attacker in top_attackers:
+            top_attackers_html += f"<li>{attacker['ip']} ({attacker['count']} attacks)</li>"
+    else:
+        top_attackers_html += "<li>No attacker data</li>"
+
+    top_attackers_html += "</ul>"
+    html_content = f"""
+    <html>
+    <body style="font-family: Arial; background:#0f172a; color:white; padding:20px;">
+
+    <!-- 🔥 LOGO HEADER -->
+    <div style="display:flex; align-items:center; gap:10px;">
+        <img src="https://cdn-icons-png.flaticon.com/512/3064/3064197.png" width="40"/>
+        <h2 style="color:#22c55e;">AegisCyber SOC</h2>
+    </div>
+
+    <p style="color:#94a3b8;">Generated: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}</p>
+
+    <!-- 🧠 AI SUMMARY -->
+    <h3 style="color:#facc15;">🧠 AI Threat Analysis</h3>
+    <p>{ai_summary}</p>
+
+    <!-- 📊 CHART -->
+    <h3 style="color:#38bdf8;">📊 Threat Distribution</h3>
+    <img src="data:image/png;base64,{img_base64}" style="width:100%; max-width:500px;"/>
+
+    <!-- 🚨 SEVERITY BOX -->
+    <div style="display:flex; gap:10px; margin-top:10px;">
+        <div style="background:red; padding:10px;">CRITICAL: {critical}</div>
+        <div style="background:orange; padding:10px;">HIGH: {high}</div>
+        <div style="background:yellow; padding:10px; color:black;">MEDIUM: {medium}</div>
+        <div style="background:green; padding:10px;">LOW: {low}</div>
+    </div>
+
+    <!-- 🎯 TOP ATTACKERS -->
+    <h3 style="margin-top:20px; color:#f97316;">🎯 Top Attackers</h3>
+    
+    {top_attackers_html}
+
+    <!-- 🔗 DASHBOARD BUTTON -->
+    <div style="margin-top:25px;">
+        <a href="http://localhost:3000/logs"
+            style="background:#22c55e; color:black; padding:12px 20px; text-decoration:none; border-radius:6px;">
+            🔍 View in Dashboard
+        </a>
+    </div>
+
+    <p style="margin-top:20px;">📎 Full report attached (if available)</p>
+
+    </body>
+    </html>
+    """
+
+    msg.set_content("SOC Alert Notification - Check HTML view")
+    msg.add_alternative(html_content, subtype='html')
+
+    # ✅ ADD THIS CONDITION (FIX)
+    if pdf_bytes:
+        msg.add_attachment(
+            pdf_bytes,
+            maintype="application",
+            subtype="pdf",
+            filename="SOC_Report.pdf"
+        )
+
+    try:
+        print("Connecting to SMTP...")
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as smtp:
+            smtp.login(
+                os.getenv("EMAIL_USER") or "",
+                os.getenv("EMAIL_PASS") or ""
+            )
+            smtp.send_message(msg)
+            print("✅ Email sent successfully")
+
+    except Exception as e:
+        print("❌ Email failed:", e)
 
 @router.get("/progress")
 def get_progress(

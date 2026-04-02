@@ -6,6 +6,7 @@ import { apiFetch, getLogs } from '@/lib/api';
 import { useRouter } from 'next/navigation';
 import Card from '@/components/ui/Card';
 import HistoryPanel from '@/components/HistoryPanel';
+import { toast } from 'react-hot-toast/headless';
 
 type ParsedLog = {
   src_ip?: string;
@@ -21,6 +22,7 @@ type ParsedLog = {
 
   severity?: string;
   risk_score?: number;
+  risk?: number;
 
   mitre_tactic?: string;
   mitre_technique?: string;
@@ -47,6 +49,7 @@ export default function LogsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
+  const [pdfLoading, setPdfLoading] = useState(false);
   const [error, setError] = useState('');
   const [progress, setProgress] = useState(0);
   const [totalLogs, setTotalLogs] = useState(0);
@@ -55,6 +58,41 @@ export default function LogsPage() {
 
   const limit = 100; // 🔥 SAME AS API
   const totalPages = Math.ceil(total / limit);
+
+  const downloadPDF = async () => {
+    try {
+      setPdfLoading(true); // 🔥 START LOADING
+
+      const response = await fetch('http://localhost:8000/logs/download', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${localStorage.getItem('token')}`,
+        },
+        body: JSON.stringify({
+          logs: logs,
+          company: 'AegisCyber SOC',
+          analyst: 'Viyom Jagtap',
+          user_email: JSON.parse(localStorage.getItem('user') || '{}')?.email,
+        }),
+      });
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'logs.pdf';
+      a.click();
+
+      alert('📧 Report sent to your email!');
+      toast.success('📧 Report sent!');
+    } catch (err) {
+      console.error('Download failed:', err);
+    } finally {
+      setPdfLoading(false); // 🔥 STOP LOADING
+    }
+  };
 
   const safe = (val: unknown) =>
     val === null || val === undefined || val === '' ? 'N/A' : String(val);
@@ -273,14 +311,24 @@ export default function LogsPage() {
           </span>
         </div>
 
-        <button
-          type="button"
-          onClick={(e) => convertLogs(e)}
-          disabled={loading}
-          className="primary-btn"
-        >
-          {loading ? 'Parsing logs...' : 'Convert Logs'}
-        </button>
+        <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
+          <button
+            type="button"
+            onClick={(e) => convertLogs(e)}
+            disabled={loading}
+            className="primary-btn"
+          >
+            {loading ? 'Parsing logs...' : 'Convert Logs'}
+          </button>
+
+          <button
+            onClick={downloadPDF}
+            className="primary-btn"
+            disabled={pdfLoading}
+          >
+            {pdfLoading ? 'Generating PDF...' : 'Download Logs PDF'}
+          </button>
+        </div>
 
         {
           <div style={{ marginTop: '15px' }}>
@@ -437,7 +485,18 @@ export default function LogsPage() {
                         {safe(l.severity)}
                       </td>
 
-                      <td>{safe(l.risk_score)}</td>
+                      <td
+                        style={{
+                          color:
+                            (l.risk_score ?? l.risk ?? 0) > 80
+                              ? '#ef4444'
+                              : (l.risk_score ?? l.risk ?? 0) > 50
+                                ? '#f97316'
+                                : '#22c55e',
+                        }}
+                      >
+                        {safe(l.risk_score ?? l.risk)}
+                      </td>
 
                       <td>{safe(l.threat)}</td>
 
