@@ -1,9 +1,9 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 import ipaddress
-import psutil
+import psutil # pyright: ignore[reportMissingModuleSource]
 import socket
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from app.database import get_db
 from app.security import require_role
@@ -15,6 +15,9 @@ router = APIRouter(
     prefix="/live-network",
     tags=["Live Network"]
 )
+
+# 🔥 ADD THIS (REAL-TIME MEMORY STORE)
+LIVE_TRAFFIC = []
 
 # ================= GEOIP INITIALIZATION =================
 
@@ -31,45 +34,6 @@ def is_private_ip(ip):
     except Exception:
         return False
 
-
-# ================= LIVE SERVER CONNECTIONS =================
-
-def get_live_connections():
-
-    connections = []
-
-    try:
-
-        net_connections = psutil.net_connections(kind="inet")
-
-        for conn in net_connections:
-
-            if not conn.raddr:
-                continue
-
-            src_ip = conn.laddr.ip
-            src_port = conn.laddr.port
-
-            dst_ip = conn.raddr.ip
-            dst_port = conn.raddr.port
-
-            protocol = "TCP" if conn.type == socket.SOCK_STREAM else "UDP"
-
-            connections.append({
-                "source_ip": src_ip,
-                "destination_ip": dst_ip,
-                "source_port": src_port,
-                "destination_port": dst_port,
-                "protocol": protocol,
-                "event_time": datetime.utcnow()
-            })
-
-    except Exception:
-        pass
-
-    return connections
-
-
 # ================= LIVE NETWORK =================
 
 @router.get("")
@@ -78,109 +42,81 @@ def get_live_network(
     user=Depends(require_role("ADMIN", "ANALYST", "VIEWER"))
 ):
 
-    live_connections = get_live_connections()
-
     result = []
 
-    for conn in live_connections:
+    # 🔥 TIME WINDOW
+    cutoff = datetime.utcnow() - timedelta(seconds=10)
 
-        src_ip = conn["source_ip"]
-        dst_ip = conn["destination_ip"]
+    from collections import defaultdict
 
-        severity = "LOW"
+    flow_map = defaultdict(set)
+
+    # 🔥 STEP 1 — FILTER + GROUP
+    for conn in LIVE_TRAFFIC:
+
+        event_time = conn.get("event_time")
+
+        if event_time:
+            try:
+                t = datetime.fromisoformat(event_time)
+                if t < cutoff:
+                    continue
+            except:
+                continue
+
+        src_ip = conn.get("source_ip")
+        dst_ip = conn.get("destination_ip")
+
+        if not src_ip or not dst_ip:
+            continue
+
+        # 🚫 ignore docker internal traffic
+        if src_ip.startswith("172.") and dst_ip.startswith("172."):
+            continue
+
+        flow_map[src_ip].add(dst_ip)
+
+    # 🔥 STEP 2 — BUILD RESPONSE
+    for src_ip, destinations in flow_map.items():
+
+        count = len(destinations)
+
+        # 🔥 DETECTION
+        if count > 10:
+            severity = "HIGH"
+        elif count > 5:
+            severity = "MEDIUM"
+        else:
+            severity = "LOW"
 
         risk = risk_score(
             severity=severity,
-            count=1,
+            count=count,
             country_risk=0,
             reputation=0
         )
 
-        if is_private_ip(src_ip) and is_private_ip(dst_ip):
-            connection_type = "Internal → Internal"
-        elif is_private_ip(src_ip):
-            connection_type = "Internal → External"
-        elif is_private_ip(dst_ip):
-            connection_type = "External → Internal"
-        else:
-            connection_type = "External → External"
-
-        country = "Internal Network"
-
-        source_lat = None
-        source_lon = None
-        dest_lat = None
-        dest_lon = None
-
-        # SOURCE GEO
-        if src_ip:
-
-            if is_private_ip(src_ip):
-
-                source_lat = 19.0760
-                source_lon = 72.8777
-
-            elif geo_reader:
-                try:
-                    geo = geo_reader.city(src_ip)
-
-                    country = geo.country.name or "Unknown"
-
-                    if geo.location.latitude and geo.location.longitude:
-                        source_lat = float(geo.location.latitude)
-                        source_lon = float(geo.location.longitude)
-
-                except Exception:
-                    country = "Unknown"
-
-        # DEST GEO
-        if dst_ip:
-
-            if is_private_ip(dst_ip):
-
-                dest_lat = 19.0760
-                dest_lon = 72.8777
-
-            elif geo_reader:
-                try:
-                    geo = geo_reader.city(dst_ip)
-
-                    if geo.location.latitude and geo.location.longitude:
-                        dest_lat = float(geo.location.latitude)
-                        dest_lon = float(geo.location.longitude)
-
-                except Exception:
-                    pass
-
-        if dest_lat is None or dest_lon is None:
-            dest_lat = 19.0760
-            dest_lon = 72.8777
-
         result.append({
             "source_ip": src_ip,
-            "destination_ip": dst_ip,
 
-            "source_port": conn["source_port"],
-            "destination_port": conn["destination_port"],
-            "protocol": conn["protocol"],
+            # 🔥 SUMMARY
+            "destination_ip": f"{count} destinations",
 
-            "connection_type": connection_type,
+            # 🔥 FULL LIST (frontend expand)
+            "destinations": list(destinations),
 
-            "threat": "Live Network Traffic",
-            "attack_count": 1,
-            "country": country,
+            "connection_type": "Grouped Traffic",
+            "threat": "Possible Scan" if count > 10 else "Normal Traffic",
+
+            "attack_count": count,
+            "country": "Multiple",
+
             "risk_score": risk.get("score"),
             "risk_level": risk.get("level"),
             "confidence": risk.get("confidence"),
-            "event_time": conn["event_time"],
-
-            "source_lat": source_lat,
-            "source_lon": source_lon,
-            "dest_lat": dest_lat,
-            "dest_lon": dest_lon
         })
 
-    return result
+    return result[:50]
 
 
 # ================= TOP TALKERS API =================
@@ -192,3 +128,29 @@ def top_talkers(
 ):
 
     return []
+
+
+# ================= REAL-TIME STREAM (ADD BELOW) =================
+
+from app.websocket.manager import manager
+
+@router.post("/stream")
+async def stream_live_network(data: dict):
+
+    print("📡 STREAM:", data)
+
+    # ✅ STORE ONLY REAL DATA
+    LIVE_TRAFFIC.append(data)
+
+    # keep last 100 only
+    if len(LIVE_TRAFFIC) > 100:
+        LIVE_TRAFFIC.pop(0)
+
+    await manager.broadcast({
+        "type": "LIVE_TRAFFIC",
+        "source_ip": data.get("source_ip"),
+        "destination_ip": data.get("destination_ip"),
+        "protocol": data.get("protocol"),
+    })
+
+    return {"status": "ok"}

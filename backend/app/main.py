@@ -199,7 +199,7 @@ app.include_router(audit.router)
 app.include_router(soc.router)
 # ✅ WebSocket (your main one)
 app.include_router(ws.router)
-
+app.include_router(live_network.router)
 # ⚠️ Keep only if needed (avoid duplication conflicts)
 app.include_router(geo_ws_router)
 
