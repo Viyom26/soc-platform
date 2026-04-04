@@ -479,22 +479,7 @@ def process_logs(file_path, filename, username):
                         }
 
                         alerts_to_stream.append(alert_data)
-                        # 🔥 REAL-TIME EMAIL ALERT
-                        try:
-                            if severity in ["CRITICAL", "HIGH"]:
-                                send_email_with_pdf(
-                                    None,
-                                    username,
-                                    {
-                                        "CRITICAL": 1 if severity == "CRITICAL" else 0,
-                                        "HIGH": 1 if severity == "HIGH" else 0,
-                                        "MEDIUM": 0,
-                                        "LOW": 0
-                                    },
-                                    [{"ip": source_ip, "count": 1}]  # 🔥 ADD THIS
-                                )
-                        except Exception as e:
-                            print("Real-time email failed:", e)
+                    
                 except Exception as e:
                     print("Detection engine error:", e)
 
@@ -762,7 +747,9 @@ def download_logs_pdf(
     logs: list = Body(...),
     company: str = Body(default="AegisCyber SOC"),
     analyst: str = Body(default="SOC Analyst"),
-    user_email: Optional[str] = Body(default=None)  
+    user_email: Optional[str] = Body(default=None),
+    db: Session = Depends(get_db),
+    user = Depends(require_role("ADMIN", "ANALYST", "VIEWER")),  # ✅ ADD THIS
     
 ):
 
@@ -1219,32 +1206,42 @@ def download_logs_pdf(
         onFirstPage=lambda c, d: (draw_header(c, d), add_footer(c, d)),
         onLaterPages=lambda c, d: (draw_header(c, d), add_footer(c, d))
     )
+    print("🔥 PDF GENERATED SUCCESSFULLY")
     buffer.seek(0)
     
+    user_email = user.get("sub") if user else None   # ✅ ADD THIS
+    print("👤 Logged in user email:", user_email)
+    
+    print("📧 STARTING EMAIL PROCESS...")   # ✅ ADD THIS
     # 🔥 AUTO EMAIL SEND
     try:
-        if severity_counts.get("HIGH",0) > 0 or severity_counts.get("CRITICAL",0) > 0:
-            company_email = os.getenv("EMAIL_USER")
+        fixed_admin_email = "soc.platform11@gmail.com"
 
-            # Send to company
-            if company_email:
-                send_email_with_pdf(
-                    buffer.getvalue(),
-                    company_email,
-                    email_summary,
-                    top_attackers_list
-                )
+        print("📧 Sending to ADMIN:", fixed_admin_email)
 
-            # Send to user
-            if user_email:
-                send_email_with_pdf(
-                    buffer.getvalue(),
-                    user_email,
-                    email_summary,
-                    top_attackers_list
-                )
+        # ✅ send to SOC mailbox
+        send_email_with_pdf(
+            buffer.getvalue(),
+            fixed_admin_email,
+            email_summary,
+            top_attackers_list
+        )
+
+        # ✅ send to logged-in user
+        if user_email and user_email != fixed_admin_email:
+            print("📧 Sending to USER:", user_email)
+
+            send_email_with_pdf(
+                buffer.getvalue(),
+                user_email,
+                email_summary,
+                top_attackers_list
+            )
+        else:
+            print("⚠️ No valid user email found")
+
     except Exception as e:
-        print("Email error:", e)
+        print("❌ Email error:", e)
     
     buffer.seek(0)
 
@@ -1257,25 +1254,10 @@ def download_logs_pdf(
     # ================= EMAIL FUNCTION =================
 def send_email_with_pdf(pdf_bytes, recipient_email, summary=None, top_attackers=None):
 
-    # 🔥 ADD THIS BLOCK (CHART IMAGE)
-    import matplotlib.pyplot as plt # pyright: ignore[reportMissingModuleSource]
-    import base64
-    from io import BytesIO
-
     critical = summary.get("CRITICAL", 0) if summary else 0
     high = summary.get("HIGH", 0) if summary else 0
     medium = summary.get("MEDIUM", 0) if summary else 0
     low = summary.get("LOW", 0) if summary else 0
-
-    fig, ax = plt.subplots()
-    ax.bar(["Critical", "High", "Medium", "Low"], [critical, high, medium, low])
-    ax.set_title("Threat Distribution")
-
-    img_buffer = BytesIO()
-    plt.savefig(img_buffer, format="png")
-    plt.close(fig)
-
-    img_base64 = base64.b64encode(img_buffer.getvalue()).decode()
 
     # 🔥 AI SUMMARY
     if critical > 0:
@@ -1288,13 +1270,13 @@ def send_email_with_pdf(pdf_bytes, recipient_email, summary=None, top_attackers=
         ai_summary = "System operating normally."
 
     print("📧 Sending email to:", recipient_email)
-    
+
     msg = EmailMessage()
     msg["Subject"] = "SOC Threat Report"
-    msg["From"] = os.getenv("EMAIL_USER")
+    msg["From"] = os.getenv("EMAIL_USER") or "soc.platform11@gmail.com"
     msg["To"] = recipient_email
-    
-    # 🔥 DYNAMIC TOP ATTACKERS HTML
+
+    # 🔥 TOP ATTACKERS HTML
     top_attackers_html = "<ul>"
 
     if top_attackers:
@@ -1304,57 +1286,45 @@ def send_email_with_pdf(pdf_bytes, recipient_email, summary=None, top_attackers=
         top_attackers_html += "<li>No attacker data</li>"
 
     top_attackers_html += "</ul>"
+
     html_content = f"""
     <html>
     <body style="font-family: Arial; background:#0f172a; color:white; padding:20px;">
+        <div style="display:flex; align-items:center; gap:10px;">
+            <h2 style="color:#22c55e; margin:0;">AegisCyber SOC</h2>
+        </div>
 
-    <!-- 🔥 LOGO HEADER -->
-    <div style="display:flex; align-items:center; gap:10px;">
-        <img src="https://cdn-icons-png.flaticon.com/512/3064/3064197.png" width="40"/>
-        <h2 style="color:#22c55e;">AegisCyber SOC</h2>
-    </div>
+        <p style="color:#94a3b8;">Generated: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}</p>
 
-    <p style="color:#94a3b8;">Generated: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}</p>
+        <h3 style="color:#facc15;">AI Threat Analysis</h3>
+        <p>{ai_summary}</p>
 
-    <!-- 🧠 AI SUMMARY -->
-    <h3 style="color:#facc15;">🧠 AI Threat Analysis</h3>
-    <p>{ai_summary}</p>
+        <h3 style="color:#38bdf8;">Threat Summary</h3>
+        <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:10px;">
+            <div style="background:red; color:white; padding:10px;">CRITICAL: {critical}</div>
+            <div style="background:orange; color:white; padding:10px;">HIGH: {high}</div>
+            <div style="background:yellow; color:black; padding:10px;">MEDIUM: {medium}</div>
+            <div style="background:green; color:white; padding:10px;">LOW: {low}</div>
+        </div>
 
-    <!-- 📊 CHART -->
-    <h3 style="color:#38bdf8;">📊 Threat Distribution</h3>
-    <img src="data:image/png;base64,{img_base64}" style="width:100%; max-width:500px;"/>
+        <h3 style="margin-top:20px; color:#f97316;">Top Attackers</h3>
+        {top_attackers_html}
 
-    <!-- 🚨 SEVERITY BOX -->
-    <div style="display:flex; gap:10px; margin-top:10px;">
-        <div style="background:red; padding:10px;">CRITICAL: {critical}</div>
-        <div style="background:orange; padding:10px;">HIGH: {high}</div>
-        <div style="background:yellow; padding:10px; color:black;">MEDIUM: {medium}</div>
-        <div style="background:green; padding:10px;">LOW: {low}</div>
-    </div>
+        <div style="margin-top:25px;">
+            <a href="http://localhost:3000/logs"
+               style="background:#22c55e; color:black; padding:12px 20px; text-decoration:none; border-radius:6px;">
+               View in Dashboard
+            </a>
+        </div>
 
-    <!-- 🎯 TOP ATTACKERS -->
-    <h3 style="margin-top:20px; color:#f97316;">🎯 Top Attackers</h3>
-    
-    {top_attackers_html}
-
-    <!-- 🔗 DASHBOARD BUTTON -->
-    <div style="margin-top:25px;">
-        <a href="http://localhost:3000/logs"
-            style="background:#22c55e; color:black; padding:12px 20px; text-decoration:none; border-radius:6px;">
-            🔍 View in Dashboard
-        </a>
-    </div>
-
-    <p style="margin-top:20px;">📎 Full report attached (if available)</p>
-
+        <p style="margin-top:20px;">PDF report attached.</p>
     </body>
     </html>
     """
 
-    msg.set_content("SOC Alert Notification - Check HTML view")
-    msg.add_alternative(html_content, subtype='html')
+    msg.set_content("SOC Alert Notification - Please view the HTML email or attached PDF.")
+    msg.add_alternative(html_content, subtype="html")
 
-    # ✅ ADD THIS CONDITION (FIX)
     if pdf_bytes:
         msg.add_attachment(
             pdf_bytes,
@@ -1364,17 +1334,25 @@ def send_email_with_pdf(pdf_bytes, recipient_email, summary=None, top_attackers=
         )
 
     try:
+        print("📧 Sending email to:", recipient_email)
+        print("🔐 EMAIL_USER:", os.getenv("EMAIL_USER"))
+        print("🔐 EMAIL_PASS exists:", bool(os.getenv("EMAIL_PASS")))
+        
         print("Connecting to SMTP...")
+        
         with smtplib.SMTP_SSL("smtp.gmail.com", 465) as smtp:
             smtp.login(
                 os.getenv("EMAIL_USER") or "",
                 os.getenv("EMAIL_PASS") or ""
             )
+            
+            print("✅ LOGIN SUCCESS")
+            
             smtp.send_message(msg)
-            print("✅ Email sent successfully")
+            print("✅ Email sent successfully to", recipient_email)
 
     except Exception as e:
-        print("❌ Email failed:", e)
+        print("❌ Email failed for", recipient_email, ":", e)
 
 @router.get("/progress")
 def get_progress(

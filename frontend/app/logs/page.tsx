@@ -72,8 +72,15 @@ export default function LogsPage() {
         body: JSON.stringify({
           logs: logs,
           company: 'AegisCyber SOC',
-          analyst: 'Viyom Jagtap',
-          user_email: JSON.parse(localStorage.getItem('user') || '{}')?.email,
+          analyst: 'DEVELOPER',
+
+          // 🔥 FIX START (VERY IMPORTANT)
+          user_email:
+            JSON.parse(localStorage.getItem('user') || '{}')?.email ||
+            localStorage.getItem('userEmail') ||
+            localStorage.getItem('email') ||
+            'soc.platform11@gmail.com',
+          // 🔥 FIX END
         }),
       });
 

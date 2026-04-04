@@ -5,7 +5,7 @@ export async function apiFetch(url: string, options: RequestInit = {}) {
     throw new Error('apiFetch must be called on client side');
   }
 
-  const token = localStorage.getItem('access_token');
+  const token = localStorage.getItem('token'); // ✅ FIX
 
   /* ===== SAFE URL NORMALIZATION ===== */
 
