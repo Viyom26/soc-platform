@@ -36,6 +36,7 @@ from app.models import alert
 from fastapi import Body
 
 from app.routes import incidents
+
 router = APIRouter(prefix="/logs", tags=["Logs"])
 
 DEFAULT_SOC_TARGET = "192.168.1.10"
@@ -96,14 +97,23 @@ def parse_timestamp(row):
 
 @router.get("")
 def get_logs(
+    page: int = Query(1),
+    limit: int = Query(100),
     db: Session = Depends(get_db),
     user=Depends(require_role("ADMIN", "ANALYST", "VIEWER")),
 ):
+    offset = (page - 1) * limit
+
+    total = db.query(ThreatLog).filter(
+        ThreatLog.user_email == user["sub"]
+    ).count()
+
     logs = (
         db.query(ThreatLog)
         .filter(ThreatLog.user_email == user["sub"])
         .order_by(ThreatLog.created_at.desc())
-        .limit(50000)
+        .offset(offset)
+        .limit(limit)
         .all()
     )
 
@@ -131,7 +141,10 @@ def get_logs(
             }
         )
 
-    return {"items": items}
+    return {
+        "items": items,
+        "total": total
+    }
 
 
 @router.post("/parse")
@@ -470,7 +483,7 @@ def process_logs(file_path, filename, username):
                     detection_result = run_detection_engine(db, log)
 
                     # ✅ ADD THIS BLOCK (VERY IMPORTANT)
-                    if detection_result and processed % 50 == 0: # type: ignore
+                    if detection_result and processed % 200 == 0: # type: ignore
                         print("🚨 DETECTED:", detection_result)
 
                         alert_data = {
@@ -1242,7 +1255,7 @@ def download_logs_pdf(
 
         if user_email and user_email != fixed_admin_email:
             print("📧 Sending to USER:", user_email)
-            
+        
             send_email_with_pdf(
                 buffer.getvalue(),
                 user_email,

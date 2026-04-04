@@ -107,7 +107,7 @@ export default function LogsPage() {
 
   const fetchLogs = useCallback(async () => {
     try {
-      const data: LogsResponse = await getLogs(page, 100);
+      const data: LogsResponse = await getLogs(page, limit);
 
       if (Array.isArray(data)) {
         setLogs(data);
@@ -115,8 +115,8 @@ export default function LogsPage() {
       }
 
       if (data && Array.isArray(data.items)) {
-        setLogs(data.items);
-        setTotal(data.total || 0); // 🔥 ADD
+        setLogs(data.items); // ✅ REAL DATA FROM BACKEND
+        setTotal(data.total || 0);
         return data.items;
       }
 
@@ -175,7 +175,7 @@ export default function LogsPage() {
 
           // ✅ AUTO FETCH WHEN DONE
           if (data.total > 0 && data.processed === data.total) {
-            setTimeout(() => fetchLogs(), 1000);
+            setTimeout(() => fetchLogs(), 3000);
           }
         }
 
@@ -191,7 +191,7 @@ export default function LogsPage() {
             created_at: new Date().toISOString(),
           };
 
-          setLogs((prev) => [newLog, ...prev]); // 🔥 LIVE ADD
+          setLogs((prev) => [newLog, ...prev].slice(0, 200)); // 🔥 LIMIT
 
           // 🔥 AUTO SCROLL TO TOP
           setTimeout(() => {
@@ -538,7 +538,7 @@ export default function LogsPage() {
 
       <div className="pagination">
         <button
-          disabled={page >= totalPages}
+          disabled={page === 1}
           onClick={() => {
             const newPage = Math.max(1, page - 1);
             setPage(newPage);
