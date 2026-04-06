@@ -80,6 +80,7 @@ export default function LiveNetworkPage() {
     );
 
     ws.onmessage = (event) => {
+      if (paused) return;
       const data = JSON.parse(event.data);
 
       if (data.type === 'LIVE_TRAFFIC') {
@@ -138,10 +139,16 @@ export default function LiveNetworkPage() {
 
   return (
     <div className="p-6 text-white">
-      <h1 className="text-2xl mb-6">Live Network Monitoring</h1>
+      <h1 className="text-2xl mb-6 flex items-center gap-3">
+        Live Network Monitoring
+        <span className="text-xs ml-2 px-2 py-1 rounded bg-slate-800">
+          {paused ? '⏸ Paused' : '🟢 Live'}
+        </span>
+      </h1>
       <div className="flex gap-3 mb-4">
         <button
           onClick={() => setPaused(false)}
+          disabled={!paused}
           className="bg-green-600 px-3 py-1 rounded"
         >
           ▶ Resume
@@ -149,13 +156,24 @@ export default function LiveNetworkPage() {
 
         <button
           onClick={() => setPaused(true)}
+          disabled={paused}
           className="bg-yellow-600 px-3 py-1 rounded"
         >
           ⏸ Pause
         </button>
 
         <button
-          onClick={() => window.location.reload()}
+          onClick={async () => {
+            try {
+              const res = await apiFetch('/api/live-network');
+              if (Array.isArray(res)) setEvents(res);
+
+              const top = await apiFetch('/api/live-network/top-talkers');
+              if (Array.isArray(top)) setTalkers(top);
+            } catch (err) {
+              console.error('Manual refresh error:', err);
+            }
+          }}
           className="bg-blue-600 px-3 py-1 rounded"
         >
           🔄 Refresh
